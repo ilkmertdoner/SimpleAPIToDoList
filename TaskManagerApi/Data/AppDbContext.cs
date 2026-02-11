@@ -9,5 +9,6 @@ namespace TaskManagerApi.Data
         
         // DbSet veritabanında bir tabloyu temsil eder. TaskItem modeli için bir DbSet tanımlanır
         public DbSet<Models.TaskItem> TaskItems { get; set; }
+        public DbSet<Models.User> Users { get; set; }
     }
 }

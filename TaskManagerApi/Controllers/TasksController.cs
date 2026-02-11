@@ -1,5 +1,7 @@
-﻿using Microsoft.AspNetCore.Http;
+﻿using System.Text;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.IdentityModel.Tokens;
 using TaskManagerApi.Data;
 using TaskManagerApi.Models;
 
@@ -13,10 +15,7 @@ namespace TaskManagerApi.Controllers
         // AppDbContext'i yönetmek daha kolay hale gelir ve test edilebilirlik artar.
         private readonly AppDbContext _dbContext;
 
-        public TasksController(AppDbContext dbContext)
-        {
-            _dbContext = dbContext;
-        }
+        public TasksController(AppDbContext dbContext) { _dbContext = dbContext; }
 
         private string GetUserIdFromHeader()
         {

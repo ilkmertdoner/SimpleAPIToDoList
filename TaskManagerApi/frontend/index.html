@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="tr">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>To-Do List</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+    <nav class="navbar">
+        <div class="brand">🚀 To-Do List</div>
+        <div style="display:flex; align-items:center; gap:15px;">
+            <span id="userDisplay" style="color:#aaa; font-size:0.9rem;"></span>
+            <button onclick="logout()" class="btn btn-danger btn-sm">Çıkış</button>
+        </div>
+    </nav>
+
+    <div class="container-center" style="align-items: flex-start; padding-top: 40px;">
+        <div class="card" style="max-width: 600px;">
+
+            <h3 style="margin-bottom: 15px;">Yeni Görev</h3>
+            <div class="form-group">
+                <input type="text" id="taskTitle" class="form-control" placeholder="Görev Başlığı Gir...">
+            </div>
+            <div class="form-group">
+                <textarea id="taskDesc" class="form-control" rows="2" placeholder="Açıklama (Opsiyonel)"></textarea>
+            </div>
+
+            <div style="display:flex; gap:10px;">
+                <button id="saveBtn" onclick="saveTask()" class="btn btn-primary">EKLE</button>
+                <button id="cancelBtn" onclick="resetForm()" class="btn btn-warning"
+                    style="display:none;">İPTAL</button>
+            </div>
+
+            <hr style="border: 0; border-top: 1px solid #333; margin: 25px 0;">
+
+            <div style="display:flex; gap:10px; margin-bottom:15px;">
+                <input type="text" id="searchInput" class="form-control" placeholder="Ara..." onkeyup="getTasks()">
+                <select id="statusFilter" class="form-control" onchange="getTasks()" style="width:150px;">
+                    <option value="all">Tümü</option>
+                    <option value="active">Aktif</option>
+                    <option value="completed">Biten</option>
+                </select>
+            </div>
+
+            <ul id="taskList" class="task-list">
+            </ul>
+
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+
+</html>
