@@ -16,6 +16,8 @@ namespace TaskManagerApi.Controllers
     {
         private readonly AppDbContext _dbContext;
         private readonly IConfiguration _configuration;
+        // Add app.settings file to the project
+        // Create JWT "Key, Issuer, Audience" in app.settings file
 
         public AuthController(AppDbContext dbContext, IConfiguration configuration)
         {
