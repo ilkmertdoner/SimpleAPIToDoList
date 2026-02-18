@@ -1,0 +1,7 @@
+﻿bin/
+obj/
+.vs/
+*.user
+appsettings.json
+appsettings.Development.json
+Migrations/

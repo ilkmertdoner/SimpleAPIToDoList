@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="tr">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Giriş Yap</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+        }
+    </script>
+    <style>
+        .theme-transition {
+            transition: background-color 0.2s smooth, color 0.2s smooth;
+        }
+    </style>
+</head>
+
+<body
+    class="theme-transition bg-slate-50 dark:bg-[#121212] text-slate-900 dark:text-slate-100 min-h-screen flex items-center justify-center p-4 font-sans relative">
+
+    <button onclick="toggleTheme()"
+        class="absolute top-4 right-4 p-2 rounded-xl bg-slate-200 dark:bg-slate-800 hover:ring-2 hover:ring-blue-500 transition-all z-10">
+        <span id="themeIcon" class="text-xl inline-block">🌙</span>
+    </button>
+
+    <div class="w-full max-w-md">
+        <div class="text-center mb-8">
+            <h1
+                class="text-3xl font-extrabold bg-gradient-to-r from-blue-600 to-indigo-500 bg-clip-text text-transparent inline-block">
+                Yapılacaklar Listesi
+            </h1>
+        </div>
+
+        <div
+            class="theme-transition bg-white dark:bg-[#1e1e1e] border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl p-8">
+            <h2 class="text-2xl font-bold mb-6 text-center">Giriş Yap</h2>
+
+            <div class="space-y-5">
+                <div class="form-group">
+                    <label class="block text-sm font-semibold mb-2 text-slate-600 dark:text-slate-400">Kullanıcı
+                        Adı</label>
+                    <input type="text" id="login-username"
+                        class="theme-transition w-full bg-slate-50 dark:bg-[#2c2c2c] border border-slate-200 dark:border-slate-700 rounded-xl p-3 outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                        placeholder="Kullanıcı adınızı girin">
+                </div>
+
+                <div class="form-group">
+                    <label class="block text-sm font-semibold mb-2 text-slate-600 dark:text-slate-400">Şifre</label>
+                    <input type="password" id="login-password"
+                        class="theme-transition w-full bg-slate-50 dark:bg-[#2c2c2c] border border-slate-200 dark:border-slate-700 rounded-xl p-3 outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                        placeholder="********">
+                </div>
+
+                <button onclick="loginUser()"
+                    class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-xl shadow-lg shadow-blue-500/20 transition-all active:scale-95 mt-2">
+                    GİRİŞ YAP
+                </button>
+            </div>
+
+            <div class="mt-8 text-center text-sm text-slate-500 dark:text-slate-400">
+                Hesabın yok mu?
+                <a href="register.html"
+                    class="text-blue-500 hover:text-blue-600 font-bold hover:underline transition-all">
+                    Kayıt Ol
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <script src="auth.js"></script>
+</body>
+
+</html>

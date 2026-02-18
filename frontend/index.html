@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="tr" class="dark">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Yapılacaklar Listesi</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = { darkMode: 'class' }
+    </script>
+    <style>
+        .theme-transition {
+            transition: all 0.2s smooth;
+        }
+
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 4px;
+        }
+
+        .dark ::-webkit-scrollbar-thumb {
+            background: #475569;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+    </style>
+</head>
+
+<body
+    class="theme-transition bg-slate-50 dark:bg-[#121212] text-slate-900 dark:text-slate-100 h-screen flex flex-col font-sans overflow-hidden">
+
+    <nav
+        class="theme-transition w-full bg-white dark:bg-[#1e1e1e] border-b border-slate-200 dark:border-slate-800 px-4 py-3 flex justify-between items-center shadow-sm z-20 flex-shrink-0">
+        <div class="flex items-center gap-4">
+            <button onclick="toggleSidebar()"
+                class="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors md:hidden">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16">
+                    </path>
+                </svg>
+            </button>
+            <div
+                class="brand text-xl font-bold bg-gradient-to-r from-blue-600 to-indigo-500 bg-clip-text text-transparent hidden sm:block">
+                Yapılacaklar Listesi
+            </div>
+        </div>
+
+        <div class="flex items-center gap-4">
+            <button onclick="toggleTheme()"
+                class="p-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:ring-2 hover:ring-blue-500 transition-all">
+                <span id="themeIcon" class="text-xl inline-block">🌙</span>
+            </button>
+            <button onclick="logout()"
+                class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-xl text-sm font-bold shadow-lg transition-all active:scale-95">
+                Çıkış
+            </button>
+        </div>
+    </nav>
+
+    <div class="flex flex-grow overflow-hidden relative w-full">
+
+        <aside id="sidebar"
+            class="theme-transition w-64 bg-white dark:bg-[#1e1e1e] border-r border-slate-200 dark:border-slate-800 flex flex-col absolute md:relative z-10 h-full transition-all duration-300 transform md:transform-none -translate-x-full md:translate-x-0 flex-shrink-0">
+
+            <div class="p-4 space-y-2">
+                <div
+                    class="flex items-center gap-3 p-3 mb-6 rounded-xl bg-slate-50 dark:bg-[#252525] border border-slate-100 dark:border-slate-700">
+                    <div
+                        class="w-10 h-10 rounded-full bg-blue-500 flex items-center justify-center text-white font-bold text-lg shadow-md">
+                        👤
+                    </div>
+                    <div>
+                        <p id="userDisplay" class="text-sm font-bold">Kullanıcı</p>
+                        <p class="text-xs text-slate-500 dark:text-slate-400">Hoş Geldiniz</p>
+                    </div>
+                </div>
+
+                <button onclick="filterTasks('all')"
+                    class="w-full flex items-center gap-3 px-4 py-3 text-left rounded-xl bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 font-medium hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors">
+                    <span>📋</span> Tüm Görevler
+                </button>
+
+                <button onclick="filterTasks('favorites')"
+                    class="w-full flex items-center gap-3 px-4 py-3 text-left rounded-xl text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#2c2c2c] transition-colors">
+                    <span>⭐</span> Favoriler
+                </button>
+
+                <button onclick="filterTasks('deleted')"
+                    class="w-full flex items-center gap-3 px-4 py-3 text-left rounded-xl text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#2c2c2c] transition-colors">
+                    <span>🗑️</span> Çöp Kutusu
+                </button>
+            </div>
+        </aside>
+
+        <main class="flex-1 p-4 md:p-8 overflow-y-auto overflow-x-hidden bg-slate-50 dark:bg-[#121212]">
+            <div class="max-w-4xl mx-auto">
+
+                <div
+                    class="bg-white dark:bg-[#1e1e1e] border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm p-6 mb-8 transition-all">
+                    <h3 class="text-lg font-bold mb-4 flex items-center gap-2">
+                        <span class="w-1 h-6 bg-blue-500 rounded-full"></span>
+                        <span id="formTitle">Yeni Görev</span>
+                    </h3>
+                    <div class="space-y-4">
+                        <input type="text" id="taskTitle"
+                            class="w-full bg-slate-50 dark:bg-[#2c2c2c] border border-slate-200 dark:border-slate-700 rounded-xl p-3 outline-none focus:ring-2 focus:ring-blue-500 dark:text-white transition-all placeholder:text-slate-400"
+                            placeholder="Görev başlığı...">
+
+                        <div class="flex flex-col sm:flex-row gap-3">
+                            <select id="taskPriority"
+                                class="w-full sm:w-1/3 bg-slate-50 dark:bg-[#2c2c2c] border border-slate-200 dark:border-slate-700 rounded-xl p-3 text-sm outline-none focus:ring-2 focus:ring-blue-500 dark:text-white transition-all cursor-pointer">
+                                <option value="1">🔵 Düşük Öncelik</option>
+                                <option value="2" selected>🟡 Orta Öncelik</option>
+                                <option value="3">🔴 Yüksek Öncelik</option>
+                            </select>
+
+                            <input type="date" id="taskDateInput"
+                                class="w-full sm:w-1/3 bg-slate-50 dark:bg-[#2c2c2c] border border-slate-200 dark:border-slate-700 rounded-xl p-3 text-sm outline-none focus:ring-2 focus:ring-blue-500 dark:text-white transition-all cursor-pointer"
+                                placeholder="Tarih Seç">
+
+                            <input type="time" id="taskTimeInput"
+                                class="w-full sm:w-1/3 bg-slate-50 dark:bg-[#2c2c2c] border border-slate-200 dark:border-slate-700 rounded-xl p-3 text-sm outline-none focus:ring-2 focus:ring-blue-500 dark:text-white transition-all cursor-pointer">
+                        </div>
+
+                        <div class="flex flex-col sm:flex-row gap-3 items-start">
+                            <textarea id="taskDesc" rows="1"
+                                class="flex-grow w-full bg-slate-50 dark:bg-[#2c2c2c] border border-slate-200 dark:border-slate-700 rounded-xl p-3 outline-none focus:ring-2 focus:ring-blue-500 dark:text-white transition-all resize-none placeholder:text-slate-400"
+                                placeholder="Not ekle..."></textarea>
+
+                            <div class="flex gap-2 w-full sm:w-auto shrink-0">
+                                <button id="cancelBtn" onclick="resetForm()"
+                                    class="hidden bg-slate-200 hover:bg-slate-300 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-800 dark:text-white font-bold px-4 py-3 rounded-xl transition-all w-full sm:w-auto">İptal</button>
+                                <button id="saveBtn" onclick="saveTask()"
+                                    class="bg-blue-600 hover:bg-blue-700 text-white font-bold px-6 py-3 rounded-xl shadow-lg transition-all active:scale-95 w-full sm:w-auto whitespace-nowrap">EKLE</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="flex flex-col gap-4 mb-6">
+                    <div class="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4">
+                        <h2 class="text-2xl font-bold dark:text-white flex items-center gap-2 whitespace-nowrap"
+                            id="pageTitle">
+                            Tüm Görevler
+                        </h2>
+
+                        <div class="flex flex-wrap gap-2 w-full xl:w-auto items-center">
+                            <div class="relative flex-grow xl:flex-grow-0 min-w-[200px]">
+                                <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">🔍</span>
+                                <input type="text" id="searchInput" onkeyup="getTasks()"
+                                    class="w-full bg-white dark:bg-[#1e1e1e] border border-slate-200 dark:border-slate-800 rounded-lg py-2 pl-9 pr-3 text-sm outline-none focus:ring-2 focus:ring-blue-500 transition-all filter-control"
+                                    placeholder="Ara...">
+                            </div>
+
+                            <select id="sortOrder" onchange="getTasks()"
+                                class="bg-white dark:bg-[#1e1e1e] border border-slate-200 dark:border-slate-800 rounded-lg p-2 text-sm outline-none cursor-pointer hover:border-blue-500 transition-all filter-control flex-grow xl:flex-grow-0">
+                                <option value="default">Sıralama: Varsayılan</option>
+                                <option value="dateAsc">📅 Tarih: Yakın > Uzak</option>
+                                <option value="dateDesc">📅 Tarih: Uzak > Yakın</option>
+                            </select>
+
+                            <select id="priorityFilter" onchange="getTasks()"
+                                class="bg-white dark:bg-[#1e1e1e] border border-slate-200 dark:border-slate-800 rounded-lg p-2 text-sm outline-none cursor-pointer hover:border-blue-500 transition-all filter-control flex-grow xl:flex-grow-0">
+                                <option value="">Öncelik: Tümü</option>
+                                <option value="3">🔴 Yüksek</option>
+                                <option value="2">🟡 Orta</option>
+                                <option value="1">🔵 Düşük</option>
+                            </select>
+
+                            <select id="statusFilter" onchange="getTasks()"
+                                class="bg-white dark:bg-[#1e1e1e] border border-slate-200 dark:border-slate-800 rounded-lg p-2 text-sm outline-none cursor-pointer hover:border-blue-500 transition-all filter-control flex-grow xl:flex-grow-0">
+                                <option value="all">Durum: Hepsi</option>
+                                <option value="active">Aktif</option>
+                                <option value="completed">Tamamlanan</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <div
+                    class="bg-slate-200/50 dark:bg-slate-900/50 rounded-2xl p-4 border border-slate-300 dark:border-slate-800 min-h-[400px] shadow-inner w-full">
+                    <ul id="taskList" class="space-y-3 w-full"></ul>
+                </div>
+            </div>
+        </main>
+
+        <div id="sidebarOverlay" onclick="toggleSidebar()"
+            class="fixed inset-0 bg-black/50 z-0 hidden md:hidden glass-effect backdrop-blur-sm transition-opacity">
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+
+</html>
