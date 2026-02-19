@@ -46,7 +46,7 @@ async function registerUser() {
     const passwordInput = document.getElementById("reg-password");
 
     if (!usernameInput.value.trim() || !passwordInput.value.trim()) {
-        alert("Alanları boş bırakma kardeşim.");
+        alert("Lütfen Alanları Doldurunuz.");
         return;
     }
 
@@ -80,7 +80,7 @@ async function loginUser() {
     const passwordInput = document.getElementById("login-password");
 
     if (!usernameInput.value.trim() || !passwordInput.value.trim()) {
-        alert("Bilgilerini gir de içeri alalım.");
+        alert("Lütfen Alanları Doldurunuz.");
         return;
     }
 

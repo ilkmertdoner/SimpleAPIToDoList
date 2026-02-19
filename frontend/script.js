@@ -173,10 +173,11 @@ function renderTasks(tasks) {
 
     if (tasks.length === 0) {
         list.innerHTML = '<div class="text-center text-slate-500 py-10">Görev bulunamadı.</div>';
+        updateSidebarStats(tasks);
         return;
     }
 
-    const now = new Date(); 
+    const now = new Date();
 
     tasks.forEach(task => {
         const tTitle = task.title || task.Title;
@@ -188,7 +189,7 @@ function renderTasks(tasks) {
         const tIsDeleted = task.isDeleted;
 
         let dateBadge = "";
-        let borderClass = "border-slate-200 dark:border-slate-700"; 
+        let borderClass = "border-slate-200 dark:border-slate-700";
 
         if (tDate) {
             const d = new Date(tDate);
@@ -197,8 +198,8 @@ function renderTasks(tasks) {
             const dStr = d.toLocaleDateString('tr-TR', options);
 
             const diffMs = d - now;
-            const isOverdue = diffMs < 0; 
-            const isUpcoming = diffMs > 0 && diffMs < (24 * 60 * 60 * 1000); 
+            const isOverdue = diffMs < 0;
+            const isUpcoming = diffMs > 0 && diffMs < (24 * 60 * 60 * 1000);
 
             let dateColorClass = "text-slate-400";
             let dateIcon = "📅";
@@ -275,6 +276,7 @@ function renderTasks(tasks) {
         list.appendChild(li);
     });
     if (canDrag) initDragAndDrop();
+    updateSidebarStats(tasks);
 }
 
 async function toggleFavorite(id) { await fetch(`${apiUrl}/Tasks/favorites/${id}`, { method: "PUT", headers: getHeaders() }); getTasks(); }
@@ -407,4 +409,28 @@ function getDragAfterElement(container, y) {
         if (offset < 0 && offset > closest.offset) return { offset: offset, element: child };
         else return closest;
     }, { offset: Number.NEGATIVE_INFINITY }).element;
+}
+
+function updateSidebarStats(tasks) {
+    const textEl = document.getElementById('successRateText');
+    const barEl = document.getElementById('successRateBar');
+    if (!textEl || !barEl) return;
+    const activeTasks = tasks.filter(t => !t.isDeleted);
+    const total = activeTasks.length;
+    if (total === 0) {
+        textEl.innerText = "0%";
+        barEl.style.width = "0%";
+        return;
+    }
+    const completed = activeTasks.filter(t => t.isCompleted).length;
+    const rate = Math.round((completed / total) * 100);
+    textEl.innerText = `%${rate}`;
+    barEl.style.width = `${rate}%`;
+    if (rate === 100) {
+        barEl.classList.remove('from-blue-500', 'to-indigo-600');
+        barEl.classList.add('from-emerald-400', 'to-green-600');
+    } else {
+        barEl.classList.add('from-blue-500', 'to-indigo-600');
+        barEl.classList.remove('from-emerald-400', 'to-green-600');
+    }
 }

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="tr" class="dark">
+<html lang="tr">
 
 <head>
     <meta charset="UTF-8">
@@ -41,11 +41,11 @@
     class="theme-transition bg-slate-50 dark:bg-[#121212] text-slate-900 dark:text-slate-100 h-screen flex flex-col font-sans overflow-hidden">
 
     <nav
-        class="theme-transition w-full bg-white dark:bg-[#1e1e1e] border-b border-slate-200 dark:border-slate-800 px-4 py-3 flex justify-between items-center shadow-sm z-20 flex-shrink-0">
+        class="theme-transition w-full bg-white dark:bg-[#1e1e1e] border-b border-slate-200 dark:border-slate-800 px-4 py-3 flex justify-between items-center shadow-sm z-40 flex-shrink-0">
         <div class="flex items-center gap-4">
             <button onclick="toggleSidebar()"
-                class="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors md:hidden">
-                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                class="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors text-slate-600 dark:text-slate-300">
+                <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16">
                     </path>
                 </svg>
@@ -71,17 +71,16 @@
     <div class="flex flex-grow overflow-hidden relative w-full">
 
         <aside id="sidebar"
-            class="theme-transition w-64 bg-white dark:bg-[#1e1e1e] border-r border-slate-200 dark:border-slate-800 flex flex-col absolute md:relative z-10 h-full transition-all duration-300 transform md:transform-none -translate-x-full md:translate-x-0 flex-shrink-0">
-
-            <div class="p-4 space-y-2">
+            class="theme-transition w-64 bg-white dark:bg-[#1e1e1e] border-r border-slate-200 dark:border-slate-800 flex flex-col absolute md:relative z-30 h-full transition-all duration-300 transform md:transform-none -translate-x-full md:translate-x-0 flex-shrink-0 shadow-2xl md:shadow-none">
+            <div class="p-4 space-y-2 flex-grow overflow-y-auto">
                 <div
                     class="flex items-center gap-3 p-3 mb-6 rounded-xl bg-slate-50 dark:bg-[#252525] border border-slate-100 dark:border-slate-700">
                     <div
-                        class="w-10 h-10 rounded-full bg-blue-500 flex items-center justify-center text-white font-bold text-lg shadow-md">
+                        class="w-10 h-10 rounded-full bg-blue-500 flex items-center justify-center text-white font-bold text-lg shadow-md shrink-0">
                         👤
                     </div>
-                    <div>
-                        <p id="userDisplay" class="text-sm font-bold">Kullanıcı</p>
+                    <div class="overflow-hidden">
+                        <p id="userDisplay" class="text-sm font-bold truncate">Kullanıcı</p>
                         <p class="text-xs text-slate-500 dark:text-slate-400">Hoş Geldiniz</p>
                     </div>
                 </div>
@@ -101,11 +100,25 @@
                     <span>🗑️</span> Çöp Kutusu
                 </button>
             </div>
+
+            <div class="p-5 border-t border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-[#1a1a1a] mt-auto">
+                <div class="flex justify-between items-end mb-2">
+                    <div>
+                        <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Başarı Oranı</span>
+                        <div class="text-2xl font-black text-slate-800 dark:text-white" id="successRateText">0%</div>
+                    </div>
+                </div>
+                <div class="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-2.5 overflow-hidden">
+                    <div id="successRateBar"
+                        class="bg-gradient-to-r from-blue-500 to-indigo-600 h-2.5 rounded-full transition-all duration-700 ease-out"
+                        style="width: 0%"></div>
+                </div>
+                <p class="text-xs text-slate-400 mt-3 text-center font-medium">Hedeflerine ulaşmaya devam et!</p>
+            </div>
         </aside>
 
         <main class="flex-1 p-4 md:p-8 overflow-y-auto overflow-x-hidden bg-slate-50 dark:bg-[#121212]">
             <div class="max-w-4xl mx-auto">
-
                 <div
                     class="bg-white dark:bg-[#1e1e1e] border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm p-6 mb-8 transition-all">
                     <h3 class="text-lg font-bold mb-4 flex items-center gap-2">
@@ -116,7 +129,6 @@
                         <input type="text" id="taskTitle"
                             class="w-full bg-slate-50 dark:bg-[#2c2c2c] border border-slate-200 dark:border-slate-700 rounded-xl p-3 outline-none focus:ring-2 focus:ring-blue-500 dark:text-white transition-all placeholder:text-slate-400"
                             placeholder="Görev başlığı...">
-
                         <div class="flex flex-col sm:flex-row gap-3">
                             <select id="taskPriority"
                                 class="w-full sm:w-1/3 bg-slate-50 dark:bg-[#2c2c2c] border border-slate-200 dark:border-slate-700 rounded-xl p-3 text-sm outline-none focus:ring-2 focus:ring-blue-500 dark:text-white transition-all cursor-pointer">
@@ -124,20 +136,15 @@
                                 <option value="2" selected>🟡 Orta Öncelik</option>
                                 <option value="3">🔴 Yüksek Öncelik</option>
                             </select>
-
                             <input type="date" id="taskDateInput"
-                                class="w-full sm:w-1/3 bg-slate-50 dark:bg-[#2c2c2c] border border-slate-200 dark:border-slate-700 rounded-xl p-3 text-sm outline-none focus:ring-2 focus:ring-blue-500 dark:text-white transition-all cursor-pointer"
-                                placeholder="Tarih Seç">
-
+                                class="w-full sm:w-1/3 bg-slate-50 dark:bg-[#2c2c2c] border border-slate-200 dark:border-slate-700 rounded-xl p-3 text-sm outline-none focus:ring-2 focus:ring-blue-500 dark:text-white transition-all cursor-pointer">
                             <input type="time" id="taskTimeInput"
                                 class="w-full sm:w-1/3 bg-slate-50 dark:bg-[#2c2c2c] border border-slate-200 dark:border-slate-700 rounded-xl p-3 text-sm outline-none focus:ring-2 focus:ring-blue-500 dark:text-white transition-all cursor-pointer">
                         </div>
-
                         <div class="flex flex-col sm:flex-row gap-3 items-start">
                             <textarea id="taskDesc" rows="1"
                                 class="flex-grow w-full bg-slate-50 dark:bg-[#2c2c2c] border border-slate-200 dark:border-slate-700 rounded-xl p-3 outline-none focus:ring-2 focus:ring-blue-500 dark:text-white transition-all resize-none placeholder:text-slate-400"
                                 placeholder="Not ekle..."></textarea>
-
                             <div class="flex gap-2 w-full sm:w-auto shrink-0">
                                 <button id="cancelBtn" onclick="resetForm()"
                                     class="hidden bg-slate-200 hover:bg-slate-300 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-800 dark:text-white font-bold px-4 py-3 rounded-xl transition-all w-full sm:w-auto">İptal</button>
@@ -154,7 +161,6 @@
                             id="pageTitle">
                             Tüm Görevler
                         </h2>
-
                         <div class="flex flex-wrap gap-2 w-full xl:w-auto items-center">
                             <div class="relative flex-grow xl:flex-grow-0 min-w-[200px]">
                                 <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">🔍</span>
@@ -162,14 +168,12 @@
                                     class="w-full bg-white dark:bg-[#1e1e1e] border border-slate-200 dark:border-slate-800 rounded-lg py-2 pl-9 pr-3 text-sm outline-none focus:ring-2 focus:ring-blue-500 transition-all filter-control"
                                     placeholder="Ara...">
                             </div>
-
                             <select id="sortOrder" onchange="getTasks()"
                                 class="bg-white dark:bg-[#1e1e1e] border border-slate-200 dark:border-slate-800 rounded-lg p-2 text-sm outline-none cursor-pointer hover:border-blue-500 transition-all filter-control flex-grow xl:flex-grow-0">
                                 <option value="default">Sıralama: Varsayılan</option>
                                 <option value="dateAsc">📅 Tarih: Yakın > Uzak</option>
                                 <option value="dateDesc">📅 Tarih: Uzak > Yakın</option>
                             </select>
-
                             <select id="priorityFilter" onchange="getTasks()"
                                 class="bg-white dark:bg-[#1e1e1e] border border-slate-200 dark:border-slate-800 rounded-lg p-2 text-sm outline-none cursor-pointer hover:border-blue-500 transition-all filter-control flex-grow xl:flex-grow-0">
                                 <option value="">Öncelik: Tümü</option>
@@ -177,7 +181,6 @@
                                 <option value="2">🟡 Orta</option>
                                 <option value="1">🔵 Düşük</option>
                             </select>
-
                             <select id="statusFilter" onchange="getTasks()"
                                 class="bg-white dark:bg-[#1e1e1e] border border-slate-200 dark:border-slate-800 rounded-lg p-2 text-sm outline-none cursor-pointer hover:border-blue-500 transition-all filter-control flex-grow xl:flex-grow-0">
                                 <option value="all">Durum: Hepsi</option>
