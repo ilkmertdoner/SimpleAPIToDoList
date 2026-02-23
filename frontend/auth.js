@@ -43,15 +43,17 @@ function toggleTheme() {
 
 async function registerUser() {
     const usernameInput = document.getElementById("reg-username");
+    const emailInput = document.getElementById("reg-email");
     const passwordInput = document.getElementById("reg-password");
 
-    if (!usernameInput.value.trim() || !passwordInput.value.trim()) {
-        alert("Lütfen Alanları Doldurunuz.");
+    if (!usernameInput.value.trim() || !emailInput.value.trim() || !passwordInput.value.trim()) {
+        alert("Lütfen tüm alanları doldurunuz.");
         return;
     }
 
     const userData = {
         username: usernameInput.value,
+        email: emailInput.value,
         password: passwordInput.value
     };
 
