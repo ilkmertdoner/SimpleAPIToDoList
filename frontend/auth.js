@@ -1,4 +1,5 @@
 const apiUrl = "https://localhost:7133/api";
+let registeredEmail = "";
 
 document.addEventListener("DOMContentLoaded", () => {
     const savedTheme = localStorage.getItem('theme');
@@ -52,9 +53,9 @@ async function registerUser() {
     }
 
     const userData = {
-        username: usernameInput.value,
-        email: emailInput.value,
-        password: passwordInput.value
+        Username: usernameInput.value,
+        Email: emailInput.value,
+        Password: passwordInput.value
     };
 
     try {
@@ -65,7 +66,49 @@ async function registerUser() {
         });
 
         if (response.ok) {
-            alert("✅ Kayıt Başarılı! Giriş ekranına yönlendiriliyorsunuz...");
+            registeredEmail = emailInput.value;
+            alert("✅ Kayıt Başarılı! Lütfen e-postanıza gelen 6 haneli doğrulama kodunu girin.");
+
+            const regForm = document.getElementById("registerContainer");
+            const verifyForm = document.getElementById("verifyContainer");
+            if (regForm && verifyForm) {
+                regForm.classList.add("hidden");
+                verifyForm.classList.remove("hidden");
+            }
+        } else {
+            const errorText = await response.text();
+            alert("❌ Hata: " + errorText);
+        }
+    } catch (error) {
+        console.error("Bağlantı Hatası:", error);
+        alert("Sunucuya bağlanılamadı!");
+    }
+}
+
+async function verifyCode() {
+    const codeInput = document.getElementById("verify-code");
+
+    if (!codeInput || !codeInput.value.trim() || codeInput.value.length !== 6) {
+        alert("Lütfen 6 haneli doğrulama kodunu girin.");
+        return;
+    }
+
+    const verifyData = {
+        Email: registeredEmail,
+        Code: codeInput.value.trim(),
+        Username: "dummy",
+        Password: "dummy"
+    };
+
+    try {
+        const response = await fetch(`${apiUrl}/Auth/verify`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(verifyData)
+        });
+
+        if (response.ok) {
+            alert("✅ E-posta doğrulandı! Giriş sayfasına yönlendiriliyorsunuz...");
             window.location.href = "login.html";
         } else {
             const errorText = await response.text();
@@ -87,8 +130,9 @@ async function loginUser() {
     }
 
     const loginData = {
-        username: usernameInput.value,
-        password: passwordInput.value
+        Username: usernameInput.value,
+        Password: passwordInput.value,
+        Email: "dummy@dummy.com"
     };
 
     try {

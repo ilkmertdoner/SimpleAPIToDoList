@@ -1,4 +1,5 @@
 const apiUrl = "https://localhost:7133/api";
+let globalTasks = [];
 
 document.addEventListener("DOMContentLoaded", () => {
     const savedTheme = localStorage.getItem('theme');
@@ -210,12 +211,13 @@ function renderFriendsUI(pending, friends) {
     friendsContainer.innerHTML = '';
 
     if (pending.length > 0) {
+        pendingContainer.classList.remove('hidden');
         pendingContainer.innerHTML = '<span class="text-[11px] font-bold text-amber-500 uppercase tracking-widest px-1">Gelen İstekler</span>';
         pending.forEach(req => {
             const reqId = req.requesterId || req.RequesterId;
             const reqName = req.requesterName || req.RequesterName;
             pendingContainer.innerHTML += `
-                <div class="flex justify-between items-center bg-amber-50 dark:bg-amber-900/20 p-2 rounded-lg border border-amber-200 dark:border-amber-800">
+                <div class="flex justify-between items-center bg-amber-50 dark:bg-amber-900/20 p-2 rounded-lg border border-amber-200 dark:border-amber-800 mt-1">
                     <div class="flex items-center gap-2">
                         <div class="w-6 h-6 rounded-full bg-amber-200 dark:bg-amber-700 flex items-center justify-center text-amber-800 dark:text-amber-100 text-[10px] font-bold shrink-0 leading-none">
                             ${reqName.charAt(0).toUpperCase()}
@@ -229,6 +231,8 @@ function renderFriendsUI(pending, friends) {
                 </div>
             `;
         });
+    } else {
+        pendingContainer.classList.add('hidden');
     }
 
     if (friends.length > 0) {
@@ -424,6 +428,7 @@ async function getTasks() {
 }
 
 function renderTasks(tasks) {
+    globalTasks = tasks;
     const list = document.getElementById("taskList");
     if (!list) return;
     list.innerHTML = "";
@@ -453,7 +458,8 @@ function renderTasks(tasks) {
         const tIsCompleted = task.isCompleted !== undefined ? task.isCompleted : task.IsCompleted;
         const tIsFavorite = task.isFavorite;
         const tIsDeleted = task.isDeleted;
-        const tAssignees = task.assign || task.Assign || [];
+
+        const tAssignees = task.assignees || task.Assignees || task.assign || task.Assign || [];
 
         let priorityBadge = "";
         if (tPriority === 1) priorityBadge = `<span class="px-2 py-0.5 rounded text-xs font-bold bg-blue-100 text-blue-600">Düşük</span>`;
@@ -473,24 +479,28 @@ function renderTasks(tasks) {
             const isUpcoming = diffMs > 0 && diffMs < (24 * 60 * 60 * 1000);
 
             let dateColorClass = "text-slate-400";
+            let dateText = `📅 ${dStr}`;
+
             if (!tIsCompleted) {
                 if (isOverdue) {
                     dateColorClass = "text-red-600 dark:text-red-400 font-bold";
                     borderClass = "border-red-300 dark:border-red-900 border-2";
+                    dateText = `📅 ${dStr} (Geçti)`;
                 } else if (isUpcoming) {
                     dateColorClass = "text-amber-600 dark:text-amber-400 font-bold";
                 }
             }
-            dateBadge = `<span class="text-xs ${dateColorClass} flex items-center gap-1">📅 ${dStr}</span>`;
+            dateBadge = `<span class="text-xs ${dateColorClass} flex items-center gap-1">${dateText}</span>`;
         }
 
         let assigneeHtml = "";
         if (tAssignees.length > 0) {
-            assigneeHtml = `<div class="flex -space-x-2 mt-2">`;
+            assigneeHtml = `<div class="flex flex-wrap space-x-0.5">`;
             tAssignees.forEach(a => {
-                const uId = a.userId || a.UserId;
-                const name = a.user?.username || a.User?.Username || a.user?.Username || a.User?.username || "A";
-                assigneeHtml += `<div onclick="event.stopPropagation(); removeUser(${task.id || task.Id}, ${uId}, '${name}')" title="@${name} - Çıkarmak için tıkla" class="cursor-pointer w-7 h-7 rounded-full bg-blue-100 dark:bg-blue-900/40 border-2 border-white dark:border-[#252525] flex items-center justify-center text-[10px] font-bold text-blue-600 dark:text-blue-400 leading-none hover:bg-red-100 hover:text-red-600 dark:hover:bg-red-900 transition-colors">${name.charAt(0).toUpperCase()}</div>`;
+                const uId = a.id || a.Id || a.userId || a.UserId;
+                const name = a.username || a.Username || a.user?.username || a.User?.Username || a.user?.Username || a.User?.username || "A";
+
+                assigneeHtml += `<div onclick="event.stopPropagation(); removeUser(${task.id || task.Id}, ${uId}, '${name}')" title="@${name} - Çıkarmak için tıkla" class="cursor-pointer w-7 h-7 rounded-full bg-blue-100 dark:bg-blue-900/40 border-2 border-white dark:border-[#252525] flex items-center justify-center text-[10px] font-bold text-blue-600 dark:text-blue-400 leading-none hover:bg-red-100 hover:text-red-600 dark:hover:bg-red-900 transition-colors shadow-sm">${name.charAt(0).toUpperCase()}</div>`;
             });
             assigneeHtml += `</div>`;
         }
@@ -509,6 +519,11 @@ function renderTasks(tasks) {
         li.className = `task-item group flex items-start w-full p-4 mb-3 border rounded-xl shadow-sm transition-all ${canDrag ? 'cursor-move hover:scale-[1.005]' : 'cursor-default'} ${tIsCompleted ? 'bg-emerald-50/90 dark:bg-emerald-900/20 border-emerald-200' : `bg-white dark:bg-[#252525] ${borderClass}`}`;
         li.draggable = canDrag;
         li.dataset.id = task.id || task.Id;
+
+        if (canDrag) {
+            li.addEventListener('dragstart', () => li.classList.add('opacity-50', 'dragging', 'scale-105'));
+            li.addEventListener('dragend', () => li.classList.remove('opacity-50', 'dragging', 'scale-105'));
+        }
 
         li.innerHTML = `
             <button class="w-6 h-6 rounded-full border-2 flex items-center justify-center text-xs font-bold transition-all shrink-0 mt-0.5 ${checkClass}" 
@@ -695,11 +710,52 @@ function renderCalendar(tasks) {
     for (let i = 1; i <= daysInMonth; i++) {
         const isToday = i === today;
         const count = taskCounts[i] || 0;
-        const baseClass = "relative text-xs p-1.5 rounded-md flex flex-col items-center justify-center transition-colors h-8";
+        const baseClass = "relative text-xs p-1.5 rounded-md flex flex-col items-center justify-center transition-colors h-8 cursor-pointer";
         const activeClass = isToday ? "bg-blue-500 text-white font-bold" : "text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600";
         let indicator = count > 0 ? `<div class="absolute bottom-1 w-1 h-1 ${isToday ? 'bg-white' : 'bg-blue-500'} rounded-full"></div>` : "";
-        html += `<div class="${baseClass} ${activeClass}"><span>${i}</span>${indicator}</div>`;
+        html += `<div class="${baseClass} ${activeClass}" onclick="openDailyModal(${year}, ${month}, ${i})"><span>${i}</span>${indicator}</div>`;
     }
     html += `</div>`;
     calContainer.innerHTML = html;
+}
+
+function openDailyModal(year, month, day) {
+    const dateObj = new Date(year, month, day);
+    const options = { day: 'numeric', month: 'long', year: 'numeric', weekday: 'long' };
+    const titleDate = dateObj.toLocaleDateString('tr-TR', options);
+    document.getElementById('dailyModalTitle').innerHTML = `📅 ${titleDate}`;
+
+    const content = document.getElementById('dailyModalContent');
+    content.innerHTML = '';
+
+    const dayTasks = globalTasks.filter(t => {
+        if (t.isDeleted) return false;
+        const dateStr = t.dueDate || t.DueDate;
+        if (!dateStr) return false;
+        const d = new Date(dateStr);
+        return d.getFullYear() === year && d.getMonth() === month && d.getDate() === day;
+    });
+
+    if (dayTasks.length === 0) {
+        content.innerHTML = '<p class="text-center text-slate-500 py-6">Bu tarihte görev bulunmuyor.</p>';
+    } else {
+        dayTasks.forEach(task => {
+            const tTitle = task.title || task.Title;
+            const isCompleted = task.isCompleted || task.IsCompleted;
+            const checkClass = isCompleted ? "bg-emerald-500 border-emerald-500 text-white" : "border-slate-300 text-transparent";
+            const titleStyle = isCompleted ? "line-through text-slate-400" : "text-slate-900 dark:text-white";
+
+            content.innerHTML += `
+                <div class="flex items-center gap-3 p-3 mb-2 border border-slate-200 dark:border-slate-700 rounded-xl bg-slate-50 dark:bg-[#252525]">
+                    <div class="w-5 h-5 rounded-full border-2 flex items-center justify-center text-[10px] font-bold shrink-0 ${checkClass}">${isCompleted ? '✔' : ''}</div>
+                    <span class="font-bold text-sm ${titleStyle}">${tTitle}</span>
+                </div>
+            `;
+        });
+    }
+    document.getElementById('dailyModal').classList.remove('hidden');
+}
+
+function closeDailyModal() {
+    document.getElementById('dailyModal').classList.add('hidden');
 }

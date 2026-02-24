@@ -12,6 +12,7 @@ namespace TaskManagerApi.Data
         public DbSet<FriendSystem> FriendSystem { get; set; }
         public DbSet<TaskAssign> TaskAssign { get; set; }
         public DbSet<ActivityLog> ActivityLogs { get; set; }
+        public DbSet<EmailToken> EmailTokens { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {

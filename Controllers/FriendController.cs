@@ -20,8 +20,11 @@ namespace TaskManagerApi.Controllers
         public FriendController(AppDbContext dbContext) { _dbContext = dbContext; }
         private string GetUserIdFromHeader()
         {
-            var userIdClaim = User.Claims.FirstOrDefault(c => c.Type == "UserId")?.Value;
-            return userIdClaim ?? "unknown";
+            var UserIdClaim = User.Claims.FirstOrDefault(c => c.Type == "UserId")?.Value;
+
+            if (!string.IsNullOrEmpty(UserIdClaim)) return UserIdClaim;
+
+            return "unknown";
         }
 
         [HttpPost("add/{username}")]

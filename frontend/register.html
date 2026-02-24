@@ -34,7 +34,7 @@
             </h1>
         </div>
 
-        <div
+        <div id="registerContainer"
             class="theme-transition bg-white dark:bg-[#1e1e1e] border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl p-8">
             <h2 class="text-2xl font-bold mb-6 text-center">Kayıt Ol</h2>
 
@@ -74,6 +74,36 @@
                 </a>
             </div>
         </div>
+
+        <div id="verifyContainer"
+            class="hidden theme-transition bg-white dark:bg-[#1e1e1e] border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl p-8">
+            <h2 class="text-2xl font-bold mb-2 text-center text-emerald-600 dark:text-emerald-400">E-Posta Doğrulama
+            </h2>
+            <p class="text-sm text-slate-500 dark:text-slate-400 text-center mb-8">E-posta adresinize gönderdiğimiz 6
+                haneli kodu giriniz.</p>
+
+            <div class="space-y-6">
+                <div class="form-group">
+                    <input type="text" id="verify-code" maxlength="6"
+                        class="theme-transition w-full bg-slate-50 dark:bg-[#2c2c2c] border border-slate-200 dark:border-slate-700 rounded-xl p-4 outline-none focus:ring-2 focus:ring-emerald-500 transition-all text-center text-4xl tracking-[0.5em] font-black text-slate-800 dark:text-white uppercase"
+                        placeholder="000000">
+                </div>
+
+                <button onclick="verifyCode()"
+                    class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-xl shadow-lg shadow-emerald-500/20 transition-all active:scale-95 mt-2">
+                    DOĞRULA
+                </button>
+            </div>
+
+            <div class="mt-8 text-center text-sm text-slate-500 dark:text-slate-400">
+                Kodu almadınız mı?
+                <button onclick="location.reload()"
+                    class="text-emerald-500 hover:text-emerald-600 font-bold hover:underline transition-all outline-none">
+                    Başa Dön ve Tekrar Dene
+                </button>
+            </div>
+        </div>
+
     </div>
 
     <script src="auth.js"></script>

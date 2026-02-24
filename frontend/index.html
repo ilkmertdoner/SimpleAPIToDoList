@@ -63,21 +63,21 @@
 
         <div class="flex items-center gap-3">
             <button onclick="openRightPanel('friends')"
-                class="p-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:ring-2 hover:ring-blue-500 transition-all"
+                class="w-10 h-10 flex items-center justify-center rounded-xl bg-slate-100 dark:bg-slate-800 hover:ring-2 hover:ring-blue-500 transition-all"
                 title="Arkadaşlarım">
-                <span class="text-xl inline-block">👥</span>
+                <span class="text-xl leading-none -translate-y-[1px]">👥</span>
             </button>
             <button onclick="openRightPanel('activities')"
-                class="p-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:ring-2 hover:ring-blue-500 transition-all"
+                class="w-10 h-10 flex items-center justify-center rounded-xl bg-slate-100 dark:bg-slate-800 hover:ring-2 hover:ring-blue-500 transition-all"
                 title="Son Hareketler">
-                <span class="text-xl inline-block">🔔</span>
+                <span class="text-xl leading-none -translate-y-[1px]">🔔</span>
             </button>
             <button onclick="toggleTheme()"
-                class="p-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:ring-2 hover:ring-blue-500 transition-all">
-                <span id="themeIcon" class="text-xl inline-block">🌙</span>
+                class="w-10 h-10 flex items-center justify-center rounded-xl bg-slate-100 dark:bg-slate-800 hover:ring-2 hover:ring-blue-500 transition-all">
+                <span id="themeIcon" class="text-xl leading-none -translate-y-[1px]">🌙</span>
             </button>
             <button onclick="logout()"
-                class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-xl text-sm font-bold shadow-lg transition-all active:scale-95 ml-2">
+                class="bg-red-500 hover:bg-red-600 text-white px-4 h-10 flex items-center justify-center rounded-xl text-sm font-bold shadow-lg transition-all active:scale-95 ml-2">
                 Çıkış
             </button>
         </div>
@@ -222,15 +222,15 @@
                     class="text-slate-500 hover:text-red-500 font-bold text-2xl leading-none">&times;</button>
             </div>
             <div class="p-4 flex-grow overflow-y-auto">
-                <div id="friendsContentContainer" class="hidden space-y-4">
-                    <div class="flex justify-between items-center px-1 mb-2">
+                <div id="friendsContentContainer" class="hidden flex-col">
+                    <div class="flex justify-between items-center px-1 mb-3">
                         <span class="text-[11px] font-bold text-slate-400 uppercase tracking-widest">Arkadaş
                             Listesi</span>
                         <button onclick="openFriendModal()"
                             class="text-blue-500 hover:text-blue-600 text-xs font-bold bg-blue-50 dark:bg-blue-900/20 px-3 py-1.5 rounded-lg transition-all">+
                             Yeni Ekle</button>
                     </div>
-                    <div id="pendingRequestsContainer" class="space-y-2 mb-4"></div>
+                    <div id="pendingRequestsContainer" class="space-y-2 mb-3 hidden"></div>
                     <div id="friendList" class="space-y-2">
                         <p
                             class="text-xs text-slate-400 text-center py-4 border border-dashed border-slate-300 dark:border-slate-700 rounded-xl">
@@ -286,6 +286,22 @@
                     class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl transition-all shadow-md">EKLE</button>
             </div>
             <div id="assignModalResult" class="text-center text-sm font-bold mt-3"></div>
+        </div>
+    </div>
+
+    <div id="dailyModal" class="fixed inset-0 z-50 flex items-center justify-center hidden p-4">
+        <div class="absolute inset-0 bg-black/60 backdrop-blur-sm" onclick="closeDailyModal()"></div>
+        <div
+            class="relative w-full max-w-lg bg-white dark:bg-[#1e1e1e] rounded-2xl shadow-2xl flex flex-col max-h-[80vh] border border-slate-200 dark:border-slate-800">
+            <div
+                class="p-5 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center bg-slate-50 dark:bg-[#1a1a1a] rounded-t-2xl">
+                <h3 id="dailyModalTitle"
+                    class="text-xl font-bold text-slate-800 dark:text-white flex items-center gap-2">📅 Görevler</h3>
+                <button onclick="closeDailyModal()"
+                    class="text-slate-500 hover:text-red-500 font-bold text-2xl leading-none">&times;</button>
+            </div>
+            <div class="p-5 overflow-y-auto flex-grow space-y-2" id="dailyModalContent">
+            </div>
         </div>
     </div>
 

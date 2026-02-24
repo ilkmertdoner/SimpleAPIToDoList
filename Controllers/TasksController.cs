@@ -36,8 +36,8 @@ namespace TaskManagerApi.Controllers
             var currentUserIdStr = GetUserIdFromHeader();
             int currentUserId = int.Parse(currentUserIdStr);
 
-            var query = _dbContext.TaskItems.Where(t => t.TokenId == currentUserIdStr ||
-                t.Assign.Any(x => x.UserId == currentUserId) && t.isDeleted == false).AsQueryable();
+            var query = _dbContext.TaskItems.Where(t => (t.TokenId == currentUserIdStr ||
+                t.Assign.Any(x => x.UserId == currentUserId)) && t.isDeleted == false).AsQueryable();
 
             if (!string.IsNullOrEmpty(search))
                 query = query.Where(t => t.Title.Contains(search) || t.Description.Contains(search));
@@ -294,7 +294,7 @@ namespace TaskManagerApi.Controllers
 
             var logs = await _dbContext.ActivityLogs
                 .Where(l => l.TokenId == currentUserId)
-                .OrderBy(l => l.CreatedAt)
+                .OrderByDescending(l => l.Id)
                 .Take(50)
                 .ToListAsync();
 
