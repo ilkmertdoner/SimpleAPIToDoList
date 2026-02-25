@@ -427,6 +427,45 @@ async function getTasks() {
     } catch (error) { console.error(error); }
 }
 
+async function toggleSubtask(event, taskId, lineIndex) {
+    event.stopPropagation();
+    const task = globalTasks.find(t => (t.id || t.Id) === taskId);
+    if (!task) return;
+
+    let desc = task.description || task.Description || "";
+    let lines = desc.split('\n');
+    let trimmedLine = lines[lineIndex].trim();
+
+    if (trimmedLine.startsWith('- [x]')) {
+        lines[lineIndex] = lines[lineIndex].replace('- [x]', '-');
+    } else if (trimmedLine.startsWith('-')) {
+        lines[lineIndex] = lines[lineIndex].replace('-', '- [x]');
+    }
+
+    const newDesc = lines.join('\n');
+    task.description = newDesc;
+    if (task.Description !== undefined) task.Description = newDesc;
+
+    const tTitle = task.title || task.Title;
+    const tStatus = task.isCompleted !== undefined ? task.isCompleted : task.IsCompleted;
+    const tFav = task.isFavorite;
+    const tPriority = task.priority !== undefined ? task.priority : task.Priority;
+    const tDate = task.dueDate || task.DueDate;
+
+    try {
+        await fetch(`${apiUrl}/Tasks/${taskId}`, {
+            method: "PUT",
+            headers: getHeaders(),
+            body: JSON.stringify({
+                Id: taskId, Title: tTitle, Description: newDesc, IsCompleted: tStatus, isFavorite: tFav, Priority: tPriority, DueDate: tDate
+            })
+        });
+        getTasks();
+    } catch (error) {
+        console.error(error);
+    }
+}
+
 function renderTasks(tasks) {
     globalTasks = tasks;
     const list = document.getElementById("taskList");
@@ -449,6 +488,7 @@ function renderTasks(tasks) {
     const now = new Date();
 
     tasks.forEach(task => {
+        const tId = task.id || task.Id;
         const tTitle = task.title || task.Title;
         let tDesc = task.description || task.Description || "";
         if (tDesc === "undefined" || tDesc === "null") tDesc = "";
@@ -500,13 +540,36 @@ function renderTasks(tasks) {
                 const uId = a.id || a.Id || a.userId || a.UserId;
                 const name = a.username || a.Username || a.user?.username || a.User?.Username || a.user?.Username || a.User?.username || "A";
 
-                assigneeHtml += `<div onclick="event.stopPropagation(); removeUser(${task.id || task.Id}, ${uId}, '${name}')" title="@${name} - Çıkarmak için tıkla" class="cursor-pointer w-7 h-7 rounded-full bg-blue-100 dark:bg-blue-900/40 border-2 border-white dark:border-[#252525] flex items-center justify-center text-[10px] font-bold text-blue-600 dark:text-blue-400 leading-none hover:bg-red-100 hover:text-red-600 dark:hover:bg-red-900 transition-colors shadow-sm">${name.charAt(0).toUpperCase()}</div>`;
+                assigneeHtml += `<div onclick="event.stopPropagation(); removeUser(${tId}, ${uId}, '${name}')" title="@${name} - Çıkarmak için tıkla" class="cursor-pointer w-7 h-7 rounded-full bg-blue-100 dark:bg-blue-900/40 border-2 border-white dark:border-[#252525] flex items-center justify-center text-[10px] font-bold text-blue-600 dark:text-blue-400 leading-none hover:bg-red-100 hover:text-red-600 dark:hover:bg-red-900 transition-colors shadow-sm">${name.charAt(0).toUpperCase()}</div>`;
             });
             assigneeHtml += `</div>`;
         }
 
+        let formattedDescHtml = "";
+        if (tDesc) {
+            const lines = tDesc.split('\n');
+            lines.forEach((line, index) => {
+                const trimmed = line.trim();
+                const isChecked = trimmed.startsWith('- [x]');
+                const isUnchecked = trimmed.startsWith('- ') && !isChecked;
+
+                if (isChecked || isUnchecked) {
+                    const text = isChecked ? trimmed.substring(5).trim() : trimmed.substring(2).trim();
+                    const checkState = isChecked ? "checked" : "";
+                    const textClass = isChecked ? "line-through text-slate-400" : "text-slate-600 dark:text-slate-400";
+                    formattedDescHtml += `
+                        <div class="flex items-center gap-2 mt-1" onclick="event.stopPropagation()">
+                            <input type="checkbox" ${checkState} onclick="toggleSubtask(event, ${tId}, ${index})" class="w-3.5 h-3.5 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer">
+                            <span class="text-xs ${textClass}">${text}</span>
+                        </div>`;
+                } else {
+                    formattedDescHtml += `<span class="block text-sm text-slate-500 dark:text-slate-400 truncate mt-0.5">${line}</span>`;
+                }
+            });
+        }
+
         const safeTitle = tTitle ? tTitle.replace(/'/g, "\\'") : "";
-        const safeDesc = tDesc ? tDesc.replace(/'/g, "\\'") : "";
+        const safeDescRaw = tDesc ? tDesc.replace(/'/g, "\\'").replace(/\n/g, "\\n") : "";
         const safeDate = tDate || "";
         const checkClass = tIsCompleted ? "bg-emerald-500 border-emerald-500 text-white" : "border-slate-300 text-transparent hover:border-emerald-500";
         const titleStyle = tIsCompleted ? "line-through text-slate-400" : "text-slate-900 dark:text-white";
@@ -518,7 +581,7 @@ function renderTasks(tasks) {
         const li = document.createElement("li");
         li.className = `task-item group flex items-start w-full p-4 mb-3 border rounded-xl shadow-sm transition-all ${canDrag ? 'cursor-move hover:scale-[1.005]' : 'cursor-default'} ${tIsCompleted ? 'bg-emerald-50/90 dark:bg-emerald-900/20 border-emerald-200' : `bg-white dark:bg-[#252525] ${borderClass}`}`;
         li.draggable = canDrag;
-        li.dataset.id = task.id || task.Id;
+        li.dataset.id = tId;
 
         if (canDrag) {
             li.addEventListener('dragstart', () => li.classList.add('opacity-50', 'dragging', 'scale-105'));
@@ -527,7 +590,7 @@ function renderTasks(tasks) {
 
         li.innerHTML = `
             <button class="w-6 h-6 rounded-full border-2 flex items-center justify-center text-xs font-bold transition-all shrink-0 mt-0.5 ${checkClass}" 
-                    onclick="event.stopPropagation(); toggleStatus(${task.id || task.Id}, '${safeTitle}', '${safeDesc}', ${!tIsCompleted}, ${tIsFavorite}, ${tPriority}, '${safeDate}')">
+                    onclick="event.stopPropagation(); toggleStatus(${tId}, '${safeTitle}', '${safeDescRaw}', ${!tIsCompleted}, ${tIsFavorite}, ${tPriority}, '${safeDate}')">
                 ${tIsCompleted ? '✔' : ''}
             </button>
             <div class="flex-grow min-w-0 flex flex-col mx-4">
@@ -536,21 +599,23 @@ function renderTasks(tasks) {
                     ${dateBadge}
                 </div>
                 <span class="block font-bold truncate text-lg ${titleStyle}">${tTitle}</span>
-                ${tDesc ? `<span class="block text-sm text-slate-500 dark:text-slate-400 truncate mt-0.5">${tDesc}</span>` : ''}
+                <div class="mt-0.5">
+                    ${formattedDescHtml}
+                </div>
                 <div class="flex items-center gap-1 mt-2">
                     ${assigneeHtml}
-                    ${!tIsDeleted ? `<button onclick="event.stopPropagation(); openAssignModal(${task.id || task.Id})" class="w-7 h-7 rounded-full bg-slate-50 dark:bg-slate-800 border border-dashed border-slate-300 dark:border-slate-600 flex items-center justify-center text-slate-500 hover:text-blue-500 hover:border-blue-500 transition-all text-sm shrink-0" title="Göreve Kişi Ekle">+</button>` : ''}
+                    ${!tIsDeleted ? `<button onclick="event.stopPropagation(); openAssignModal(${tId})" class="w-7 h-7 rounded-full bg-slate-50 dark:bg-slate-800 border border-dashed border-slate-300 dark:border-slate-600 flex items-center justify-center text-slate-500 hover:text-blue-500 hover:border-blue-500 transition-all text-sm shrink-0" title="Göreve Kişi Ekle">+</button>` : ''}
                 </div>
             </div>
             <div class="flex items-center shrink-0 gap-1">
                 ${!tIsDeleted ? `
-                    <button class="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition-all" onclick="event.stopPropagation(); toggleFavorite(${task.id || task.Id})">${starIcon}</button>
+                    <button class="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition-all" onclick="event.stopPropagation(); toggleFavorite(${tId})">${starIcon}</button>
                     <div class="w-px h-6 bg-slate-200 dark:bg-slate-700 mx-1"></div>
-                    <button class="p-1.5 rounded-lg text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-900/20 transition-all" onclick="event.stopPropagation(); startEditMode('${task.id || task.Id}', '${safeTitle}', '${safeDesc}', ${tIsCompleted}, ${tIsFavorite}, ${tPriority}, '${safeDate}')">✏️</button>
-                    <button class="p-1.5 rounded-lg text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-all" onclick="event.stopPropagation(); toggleBin(${task.id || task.Id})">🗑️</button>
+                    <button class="p-1.5 rounded-lg text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-900/20 transition-all" onclick="event.stopPropagation(); startEditMode('${tId}', '${safeTitle}', '${safeDescRaw}', ${tIsCompleted}, ${tIsFavorite}, ${tPriority}, '${safeDate}')">✏️</button>
+                    <button class="p-1.5 rounded-lg text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-all" onclick="event.stopPropagation(); toggleBin(${tId})">🗑️</button>
                 ` : `
-                    <button class="px-3 py-1.5 text-blue-500 border border-blue-500 rounded-lg text-xs font-bold hover:bg-blue-500 hover:text-white transition-all" onclick="event.stopPropagation(); toggleBin(${task.id || task.Id})">GERİ YÜKLE</button>
-                    <button class="px-3 py-1.5 text-red-500 border border-red-500 rounded-lg text-xs font-bold hover:bg-red-500 hover:text-white transition-all ml-2" onclick="event.stopPropagation(); deleteTask(${task.id || task.Id})">SİL</button>
+                    <button class="px-3 py-1.5 text-blue-500 border border-blue-500 rounded-lg text-xs font-bold hover:bg-blue-500 hover:text-white transition-all" onclick="event.stopPropagation(); toggleBin(${tId})">GERİ YÜKLE</button>
+                    <button class="px-3 py-1.5 text-red-500 border border-red-500 rounded-lg text-xs font-bold hover:bg-red-500 hover:text-white transition-all ml-2" onclick="event.stopPropagation(); deleteTask(${tId})">SİL</button>
                 `}
             </div>
         `;
@@ -682,18 +747,25 @@ function updateSidebarStats(tasks) {
     barEl.style.width = `${rate}%`;
 }
 
+let currentCalendarDate = new Date();
+
 function renderCalendar(tasks) {
     const calContainer = document.getElementById('miniCalendar');
     if (!calContainer) return;
-    const now = new Date();
-    const year = now.getFullYear();
-    const month = now.getMonth();
-    const today = now.getDate();
+
+    const year = currentCalendarDate.getFullYear();
+    const month = currentCalendarDate.getMonth();
+    const today = new Date();
+
     const monthNames = ["Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran", "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık"];
     const dayNames = ["Pzt", "Sal", "Çar", "Per", "Cum", "Cmt", "Paz"];
-    const firstDay = new Date(year, month, 1).getDay();
-    const adjustedFirstDay = firstDay === 0 ? 6 : firstDay - 1;
+
+    const firstDayOfMonth = new Date(year, month, 1).getDay();
+    const adjustedFirstDay = firstDayOfMonth === 0 ? 6 : firstDayOfMonth - 1;
     const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+    const prevMonthLastDay = new Date(year, month, 0).getDate();
+
     const taskCounts = {};
     tasks.forEach(t => {
         const dateStr = t.dueDate || t.DueDate;
@@ -705,18 +777,47 @@ function renderCalendar(tasks) {
             }
         }
     });
-    let html = `<div class="flex justify-between items-center mb-3 px-1"><span class="text-sm font-bold text-slate-800 dark:text-white">${monthNames[month]} ${year}</span></div><div class="grid grid-cols-7 gap-1 text-center mb-2">${dayNames.map(d => `<div class="text-[10px] font-bold text-slate-400">${d}</div>`).join('')}</div><div class="grid grid-cols-7 gap-1 text-center">`;
-    for (let i = 0; i < adjustedFirstDay; i++) html += `<div></div>`;
+
+    let html = `
+        <div class="flex justify-between items-center mb-3 px-1">
+            <span class="text-sm font-bold text-slate-800 dark:text-white">${monthNames[month]} ${year}</span>
+            <div class="flex gap-1">
+                <button onclick="changeMonth(-1)" class="p-1 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-md transition-colors text-slate-500">❮</button>
+                <button onclick="changeMonth(1)" class="p-1 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-md transition-colors text-slate-500">❯</button>
+            </div>
+        </div>
+        <div class="grid grid-cols-7 gap-1 text-center mb-2">
+            ${dayNames.map(d => `<div class="text-[10px] font-bold text-slate-400">${d}</div>`).join('')}
+        </div>
+        <div class="grid grid-cols-7 gap-1 text-center">`;
+
+    for (let i = adjustedFirstDay; i > 0; i--) {
+        const prevDay = prevMonthLastDay - i + 1;
+        html += `<div class="text-xs p-1.5 rounded-md flex flex-col items-center justify-center h-8 text-slate-300 dark:text-slate-600 cursor-not-allowed"><span>${prevDay}</span></div>`;
+    }
+
     for (let i = 1; i <= daysInMonth; i++) {
-        const isToday = i === today;
+        const isToday = i === today.getDate() && month === today.getMonth() && year === today.getFullYear();
         const count = taskCounts[i] || 0;
         const baseClass = "relative text-xs p-1.5 rounded-md flex flex-col items-center justify-center transition-colors h-8 cursor-pointer";
         const activeClass = isToday ? "bg-blue-500 text-white font-bold" : "text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600";
         let indicator = count > 0 ? `<div class="absolute bottom-1 w-1 h-1 ${isToday ? 'bg-white' : 'bg-blue-500'} rounded-full"></div>` : "";
         html += `<div class="${baseClass} ${activeClass}" onclick="openDailyModal(${year}, ${month}, ${i})"><span>${i}</span>${indicator}</div>`;
     }
+
+    const totalCells = adjustedFirstDay + daysInMonth;
+    const nextMonthDays = totalCells % 7 === 0 ? 0 : 7 - (totalCells % 7);
+    for (let i = 1; i <= nextMonthDays; i++) {
+        html += `<div class="text-xs p-1.5 rounded-md flex flex-col items-center justify-center h-8 text-slate-300 dark:text-slate-600 cursor-not-allowed"><span>${i}</span></div>`;
+    }
+
     html += `</div>`;
     calContainer.innerHTML = html;
+}
+
+function changeMonth(offset) {
+    currentCalendarDate.setMonth(currentCalendarDate.getMonth() + offset);
+    getTasks();
 }
 
 function openDailyModal(year, month, day) {
