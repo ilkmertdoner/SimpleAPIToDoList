@@ -141,7 +141,8 @@ namespace TaskManagerApi.Controllers
             _dbContext.Users.Add(newUser);
             _dbContext.EmailTokens.Remove(tokenRecord);
 
-            var expiredTokens = await _dbContext.EmailTokens.Where(x => x.ExpirationDate < DateTime.UtcNow).ToListAsync();
+            var expiredTokens = await _dbContext.EmailTokens.Where(x => x.ExpirationDate < DateTime.UtcNow)
+                .ToListAsync();
 
             if (expiredTokens.Any()) _dbContext.EmailTokens.RemoveRange(expiredTokens);
 

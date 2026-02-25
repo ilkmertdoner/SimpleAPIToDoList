@@ -10,6 +10,7 @@ namespace TaskManagerApi.Models
         public string Username { get; set; }
         public string Password { get; set; }
         public string Code { get; set; }
+        
         public DateTime ExpirationDate { get; set; }
     }
 }

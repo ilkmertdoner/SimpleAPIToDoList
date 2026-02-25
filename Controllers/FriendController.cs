@@ -18,6 +18,7 @@ namespace TaskManagerApi.Controllers
     {
         private readonly AppDbContext _dbContext;
         public FriendController(AppDbContext dbContext) { _dbContext = dbContext; }
+        
         private string GetUserIdFromHeader()
         {
             var UserIdClaim = User.Claims.FirstOrDefault(c => c.Type == "UserId")?.Value;

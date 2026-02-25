@@ -21,7 +21,6 @@ namespace TaskManagerApi.Controllers
 
         private string GetUserIdFromHeader()
         {
-            //Authorize kullandığımız için claim ile erişilmelidir.
             var UserIdClaim = User.Claims.FirstOrDefault(c => c.Type == "UserId")?.Value;
 
             if (!string.IsNullOrEmpty(UserIdClaim)) return UserIdClaim;
