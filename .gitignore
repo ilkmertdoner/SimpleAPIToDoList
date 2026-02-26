@@ -5,3 +5,5 @@ obj/
 appsettings.json
 appsettings.Development.json
 Migrations/
+.json
+*.json

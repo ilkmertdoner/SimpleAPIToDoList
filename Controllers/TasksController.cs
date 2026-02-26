@@ -1,5 +1,6 @@
 ﻿using System.Security.Claims;
 using System.Text;
+using Google.Apis.Calendar.v3;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -7,6 +8,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using TaskManagerApi.Data;
 using TaskManagerApi.Models;
+using TaskManagerApi.Service;
 
 namespace TaskManagerApi.Controllers
 {
@@ -16,8 +18,13 @@ namespace TaskManagerApi.Controllers
     public class TasksController : ControllerBase
     {
         private readonly AppDbContext _dbContext;
+        private readonly GoogleCalendarService _calendarService;
 
-        public TasksController(AppDbContext dbContext) { _dbContext = dbContext; }
+        public TasksController(AppDbContext dbContext, GoogleCalendarService calendarService)
+        {
+            _dbContext = dbContext;
+            _calendarService = calendarService;
+        }
 
         private string GetUserIdFromHeader()
         {
@@ -129,12 +136,28 @@ namespace TaskManagerApi.Controllers
             if (task == null) return BadRequest();
 
             task.TokenId = GetUserIdFromHeader();
+            var user = await _dbContext.Users.FindAsync(int.Parse(task.TokenId));
 
             if (task.DateTime == default) task.DateTime = DateTime.UtcNow;
 
             try
             {
                 await _dbContext.TaskItems.AddAsync(task);
+
+                if (task.DueDate.HasValue && user != null && 
+                    user.Email.EndsWith("@gmail.com",StringComparison.OrdinalIgnoreCase))
+                {
+                    try
+                    {
+                        var userEmail = user.Email;
+                        await _calendarService.AddTaskToUserCalendarAsync
+                            (userEmail, task.Title, task.Description, task.DueDate.Value);
+                    }
+                    catch
+                    {
+                    }
+                }
+                
                 await _dbContext.SaveChangesAsync();
                 return CreatedAtAction(nameof(GetTasks), new { id = task.Id }, task);
             }

@@ -8,6 +8,7 @@ using TaskManagerApi.Data;
 using TaskManagerApi.Models;
 using System.Net;
 using System.Net.Mail;
+using Microsoft.AspNetCore.Authorization;
 
 namespace TaskManagerApi.Controllers
 {
@@ -74,9 +75,9 @@ namespace TaskManagerApi.Controllers
                 mailMessage.To.Add(user.Email);
                 await smtpClient.SendMailAsync(mailMessage);
             }
-            catch
+            catch (Exception ex)
             {
-                return BadRequest("Sistem Hatası Oluştu.");
+                return BadRequest($"SMTP Hatası: {ex.Message}");
             }
 
             return Ok(new { message = "Kayıt Başarılı. Lütfen e-postanıza gelen kodu giriniz.", email = user.Email });
@@ -149,6 +150,37 @@ namespace TaskManagerApi.Controllers
             await _dbContext.SaveChangesAsync();
 
             return Ok(new { message = "Kayıt Başarılı. Giriş Yapabilirsiniz." });
+        }
+
+        [Authorize]
+        [HttpDelete("delete")]
+        public async Task<IActionResult> DeleteAccount()
+        {
+            var userIdString = User.FindFirstValue("UserId");
+            if (string.IsNullOrEmpty(userIdString)) return Unauthorized();
+
+            var user = await _dbContext.Users.FindAsync(int.Parse(userIdString));
+            if (user == null) return NotFound("Sistem Hatası.");
+
+            int parseUser = int.Parse(userIdString);
+
+            var friendships = await _dbContext.FriendSystem.Where(f => f.RequesterId == parseUser ||
+               f.ReceiverId == parseUser).ToListAsync();
+
+            if(friendships.Any()) _dbContext.FriendSystem.RemoveRange(friendships);
+
+            var ownedTask = await _dbContext.TaskItems.Where(t => t.TokenId == userIdString).ToListAsync();
+
+            if (ownedTask.Any()) _dbContext.TaskItems.RemoveRange(ownedTask);
+
+            var assignedTask = await _dbContext.TaskAssign.Where(t => t.UserId == parseUser).ToListAsync();
+
+            if (assignedTask.Any()) _dbContext.TaskAssign.RemoveRange(assignedTask);
+
+            _dbContext.Users.Remove(user);
+            await _dbContext.SaveChangesAsync();
+
+            return Ok(new { message = "Hesabınız Başarıyla Silindi" });
         }
     }
 }
