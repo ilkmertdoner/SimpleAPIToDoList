@@ -55,7 +55,6 @@ namespace TaskManagerApi.Controllers
 
             var tasks = await query.Select(t => new
             {
-                // automapper kullanılabilir.
                 Id = t.Id,
                 Title = t.Title,
                 Description = t.Description,
@@ -65,6 +64,7 @@ namespace TaskManagerApi.Controllers
                 IsFavorite = t.isFavorite,
                 IsDeleted = t.isDeleted,
                 TokenId = t.TokenId,
+                GoogleCalendarEventId = t.GoogleCalendarEventId,
                 Assign = t.Assign.Select(a => new
                 {
                     UserId = a.UserId,
@@ -142,81 +142,124 @@ namespace TaskManagerApi.Controllers
 
             try
             {
-                await _dbContext.TaskItems.AddAsync(task);
-
-                if (task.DueDate.HasValue && user != null && 
-                    user.Email.EndsWith("@gmail.com",StringComparison.OrdinalIgnoreCase))
+                if (task.DueDate.HasValue && user != null &&
+                    user.Email.EndsWith("@gmail.com", StringComparison.OrdinalIgnoreCase))
                 {
                     try
                     {
                         var userEmail = user.Email;
-                        await _calendarService.AddTaskToUserCalendarAsync
-                            (userEmail, task.Title, task.Description, task.DueDate.Value);
+                        string safeDescription = task.Description ?? "";
+                        string eventId = await _calendarService.AddTaskToUserCalendarAsync
+                            (userEmail, task.Title, safeDescription, task.DueDate.Value);
+
+                        task.GoogleCalendarEventId = eventId;
                     }
                     catch
                     {
                     }
                 }
-                
+
+                await _dbContext.TaskItems.AddAsync(task);
                 await _dbContext.SaveChangesAsync();
                 return CreatedAtAction(nameof(GetTasks), new { id = task.Id }, task);
             }
             catch (Exception ex)
             {
-                return StatusCode(StatusCodes.Status500InternalServerError, $"Error creating task: {ex.Message}");
+                return StatusCode(StatusCodes.Status500InternalServerError, ex.Message);
             }
         }
 
         [HttpPut("{id}")]
-        public async Task<IActionResult> UpdateTask(int id, [FromBody] TaskItem UpdatedTask)
+        public async Task<IActionResult> UpdateTask(int id, [FromBody] TaskItem updatedTask)
         {
-            var userId = GetUserIdFromHeader();
-            var task = await _dbContext.TaskItems.FirstOrDefaultAsync(t => t.Id == id && t.TokenId == userId);
+            var userIdString = GetUserIdFromHeader();
+            var existingTask = await _dbContext.TaskItems.FirstOrDefaultAsync(t => t.Id == id && 
+                t.TokenId == userIdString);
 
-            if (task != null)
+            if (existingTask == null) return NotFound();
+
+            existingTask.Title = updatedTask.Title;
+            existingTask.Description = updatedTask.Description;
+            existingTask.IsCompleted = updatedTask.IsCompleted;
+            existingTask.isFavorite = updatedTask.isFavorite;
+            existingTask.Priority = updatedTask.Priority;
+            existingTask.DueDate = updatedTask.DueDate;
+
+            var user = await _dbContext.Users.FindAsync(int.Parse(userIdString));
+
+            if (user != null && !string.IsNullOrEmpty(user.Email) && user.Email.EndsWith("@gmail.com",
+                StringComparison.OrdinalIgnoreCase))
             {
-                try
+                if (!string.IsNullOrEmpty(existingTask.GoogleCalendarEventId))
                 {
-                    task.Title = UpdatedTask.Title;
-                    task.Description = UpdatedTask.Description;
-                    task.IsCompleted = UpdatedTask.IsCompleted;
-                    task.DueDate = UpdatedTask.DueDate;
-                    task.Priority = UpdatedTask.Priority;
-
-                    await _dbContext.SaveChangesAsync();
-                    return Ok(task);
+                    if (existingTask.DueDate.HasValue)
+                    {
+                        try
+                        {
+                            await _calendarService.UpdateTaskInUserCalendarAsync(user.Email, existingTask.GoogleCalendarEventId, 
+                                existingTask.Title, existingTask.Description ?? "", existingTask.DueDate.Value);
+                        }
+                        catch
+                        {
+                        }
+                    }
+                    else
+                    {
+                        try
+                        {
+                            await _calendarService.DeleteTaskFromUserCalendarAsync(user.Email,
+                                existingTask.GoogleCalendarEventId);
+                        }
+                        catch
+                        {
+                        }
+                        existingTask.GoogleCalendarEventId = null;
+                    }
                 }
-                catch (Exception ex)
+                else if (existingTask.DueDate.HasValue)
                 {
-                    return StatusCode(StatusCodes.Status500InternalServerError, $"Error updating task: {ex.Message}");
+                    try
+                    {
+                        string eventId = await _calendarService.AddTaskToUserCalendarAsync(user.Email,
+                            existingTask.Title, existingTask.Description ?? "", existingTask.DueDate.Value);
+
+                        existingTask.GoogleCalendarEventId = eventId;
+                    }
+                    catch
+                    {
+                    }
                 }
             }
 
-            return NotFound();
+            await _dbContext.SaveChangesAsync();
+            return Ok(existingTask);
         }
 
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteTask(int id)
         {
-            var userId = GetUserIdFromHeader();
-            var task = await _dbContext.TaskItems.FirstOrDefaultAsync(t => t.Id == id && t.TokenId == userId);
+            var userIdString = GetUserIdFromHeader();
+            var task = await _dbContext.TaskItems.FirstOrDefaultAsync(t => t.Id == id && t.TokenId == userIdString);
 
-            if (task != null)
+            if (task == null) return NotFound();
+
+            var user = await _dbContext.Users.FindAsync(int.Parse(userIdString));
+
+            if (user != null && !string.IsNullOrEmpty(user.Email) && !string.IsNullOrEmpty(task.GoogleCalendarEventId))
             {
                 try
                 {
-                    _dbContext.TaskItems.Remove(task);
-                    await _dbContext.SaveChangesAsync();
-
-                    return NoContent();
+                    await _calendarService.DeleteTaskFromUserCalendarAsync(user.Email, task.GoogleCalendarEventId);
                 }
-                catch (Exception ex)
+                catch
                 {
-                    return StatusCode(StatusCodes.Status500InternalServerError, $"Error deleting task: {ex.Message}");
                 }
             }
 
-            return NotFound();
+            _dbContext.TaskItems.Remove(task);
+            await _dbContext.SaveChangesAsync();
+
+            return Ok();
         }
 
         [HttpPost("{taskId}/assign/{userId}")]

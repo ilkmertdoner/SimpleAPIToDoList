@@ -94,10 +94,20 @@
                     <div
                         class="w-10 h-10 rounded-full bg-blue-500 flex items-center justify-center text-white font-bold text-lg shadow-md shrink-0">
                         👤</div>
-                    <div class="overflow-hidden">
+                    <div class="overflow-hidden flex-1">
                         <p id="userDisplay" class="text-sm font-bold truncate">Kullanıcı</p>
                         <p class="text-xs text-slate-500 dark:text-slate-400">Hoş Geldiniz</p>
                     </div>
+                    <button onclick="deleteAccount()" title="Hesabımı Sil"
+                        class="shrink-0 p-2 text-red-500 hover:text-red-600 hover:bg-red-100 dark:hover:bg-red-900/30 rounded-lg transition-colors">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24"
+                            stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+                            <path stroke-linecap="round" stroke-linejoin="round"
+                                d="M9 14a6 6 0 00-6 6v1h12v-1a6 6 0 00-6-6z" />
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M17 8l4 4m0-4l-4 4" />
+                        </svg>
+                    </button>
                 </div>
 
                 <div class="space-y-1">
@@ -112,13 +122,6 @@
                     <button onclick="filterTasks('deleted')"
                         class="w-full flex items-center gap-3 px-4 py-2.5 text-left rounded-xl text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#2c2c2c] transition-colors">
                         <span>🗑️</span> Çöp Kutusu
-                    </button>
-
-                    <div class="h-px bg-slate-200 dark:bg-slate-800 my-3"></div>
-
-                    <button onclick="deleteAccount()"
-                        class="w-full flex items-center gap-3 px-4 py-2.5 text-left rounded-xl text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors font-bold">
-                        <span>⚠️</span> Hesabımı Sil
                     </button>
                 </div>
 

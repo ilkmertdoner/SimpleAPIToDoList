@@ -451,13 +451,14 @@ async function toggleSubtask(event, taskId, lineIndex) {
     const tFav = task.isFavorite;
     const tPriority = task.priority !== undefined ? task.priority : task.Priority;
     const tDate = task.dueDate || task.DueDate;
+    const tEventId = task.googleCalendarEventId || task.GoogleCalendarEventId || null;
 
     try {
         await fetch(`${apiUrl}/Tasks/${taskId}`, {
             method: "PUT",
             headers: getHeaders(),
             body: JSON.stringify({
-                Id: taskId, Title: tTitle, Description: newDesc, IsCompleted: tStatus, isFavorite: tFav, Priority: tPriority, DueDate: tDate
+                Id: taskId, Title: tTitle, Description: newDesc, IsCompleted: tStatus, isFavorite: tFav, Priority: tPriority, DueDate: tDate, GoogleCalendarEventId: tEventId
             })
         });
         getTasks();
@@ -634,6 +635,7 @@ let isEditing = false;
 let editingId = null;
 let editingStatus = false;
 let editingFavorite = false;
+let editingEventId = null;
 
 async function saveTask() {
     const titleInput = document.getElementById("taskTitle");
@@ -659,7 +661,8 @@ async function saveTask() {
         Priority: parseInt(priorityInput.value) || 0,
         DueDate: finalDueDate,
         IsCompleted: isEditing ? editingStatus : false,
-        isFavorite: isEditing ? editingFavorite : false
+        isFavorite: isEditing ? editingFavorite : false,
+        GoogleCalendarEventId: isEditing ? editingEventId : null
     };
 
     let url = isEditing ? `${apiUrl}/Tasks/${editingId}` : `${apiUrl}/Tasks`;
@@ -688,11 +691,14 @@ async function saveTask() {
 }
 
 async function toggleStatus(id, title, desc, status, isFav, priority, dueDate) {
+    const task = globalTasks.find(t => (t.id || t.Id) === id);
+    const eventId = task ? (task.googleCalendarEventId || task.GoogleCalendarEventId) : null;
+
     await fetch(`${apiUrl}/Tasks/${id}`, {
         method: "PUT",
         headers: getHeaders(),
         body: JSON.stringify({
-            Id: id, Title: title, Description: desc, IsCompleted: status, isFavorite: isFav, Priority: priority, DueDate: dueDate && dueDate !== "null" ? dueDate : null
+            Id: id, Title: title, Description: desc, IsCompleted: status, isFavorite: isFav, Priority: priority, DueDate: dueDate && dueDate !== "null" ? dueDate : null, GoogleCalendarEventId: eventId
         })
     });
     getTasks();
@@ -700,6 +706,9 @@ async function toggleStatus(id, title, desc, status, isFav, priority, dueDate) {
 }
 
 function startEditMode(id, title, desc, status, isFav, priority, dueDate) {
+    const task = globalTasks.find(t => (t.id || t.Id) == id);
+    editingEventId = task ? (task.googleCalendarEventId || task.GoogleCalendarEventId) : null;
+
     isEditing = true;
     editingId = id;
     editingStatus = status;
@@ -723,6 +732,7 @@ function startEditMode(id, title, desc, status, isFav, priority, dueDate) {
 function resetForm() {
     isEditing = false;
     editingId = null;
+    editingEventId = null;
     document.getElementById("taskTitle").value = "";
     document.getElementById("taskDesc").value = "";
     document.getElementById("taskPriority").value = "2";

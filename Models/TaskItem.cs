@@ -18,6 +18,7 @@ namespace TaskManagerApi.Models
         public bool isFavorite { get; set; } = false;
         public bool isDeleted { get; set; } = false;
         public string? TokenId { get; set; }
+        public string? GoogleCalendarEventId { get; set; }
 
         [JsonIgnore]
         public ICollection<TaskAssign>? Assign { get; set; }
