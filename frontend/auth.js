@@ -2,6 +2,12 @@ const apiUrl = "https://localhost:7133/api";
 let registeredEmail = "";
 
 document.addEventListener("DOMContentLoaded", () => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const error = urlParams.get('error');
+    if (error === 'notfound') alert("Bu hesap sistemimizde kayıtlı değil. Lütfen önce kayıt olun.");
+    if (error === 'exists') alert("Bu hesap zaten kayıtlı. Lütfen giriş yapın.");
+    if (error) window.history.replaceState({}, document.title, window.location.pathname);
+
     const savedTheme = localStorage.getItem('theme');
     const themeIcon = document.getElementById('themeIcon');
     const html = document.documentElement;
@@ -41,7 +47,9 @@ function toggleTheme() {
         localStorage.setItem('theme', 'dark');
     }
 
-    renderGoogleButton();
+    if (typeof renderGoogleButton === 'function') {
+        renderGoogleButton();
+    }
 }
 
 async function registerUser() {
@@ -55,8 +63,8 @@ async function registerUser() {
     }
 
     const userData = {
-        Username: usernameInput.value,
-        Email: emailInput.value,
+        Username: usernameInput.value.trim(),
+        Email: emailInput.value.trim(),
         Password: passwordInput.value
     };
 
@@ -68,18 +76,14 @@ async function registerUser() {
         });
 
         if (response.ok) {
-            registeredEmail = emailInput.value;
-            alert("✅ Kayıt Başarılı! Lütfen e-postanıza gelen 6 haneli doğrulama kodunu girin.");
-
-            const regForm = document.getElementById("registerContainer");
-            const verifyForm = document.getElementById("verifyContainer");
-            if (regForm && verifyForm) {
-                regForm.classList.add("hidden");
-                verifyForm.classList.remove("hidden");
-            }
+            registeredEmail = userData.Email;
+            localStorage.setItem("registeredEmail", userData.Email);
+            alert("Kayıt Başarılı! Lütfen e-postanıza gelen kodu girin.");
+            document.getElementById("registerContainer").classList.add("hidden");
+            document.getElementById("verifyContainer").classList.remove("hidden");
         } else {
             const errorText = await response.text();
-            alert("❌ Hata: " + errorText);
+            alert(errorText);
         }
     } catch (error) {
         alert("Sunucuya bağlanılamadı!");
@@ -88,15 +92,25 @@ async function registerUser() {
 
 async function verifyCode() {
     const codeInput = document.getElementById("verify-code");
+    const codeValue = codeInput ? codeInput.value.replace(/[^0-9]/g, '') : "";
 
-    if (!codeInput || !codeInput.value.trim() || codeInput.value.length !== 6) {
-        alert("Lütfen 6 haneli doğrulama kodunu girin.");
+    if (codeValue.length !== 6) {
+        alert("Lütfen 6 haneli doğrulama kodunu eksiksiz girin.");
+        return;
+    }
+
+    if (!registeredEmail) {
+        registeredEmail = localStorage.getItem("registeredEmail");
+    }
+
+    if (!registeredEmail) {
+        alert("E-posta bilgisi bulunamadı. Lütfen sayfayı yenileyip tekrar kayıt olun.");
         return;
     }
 
     const verifyData = {
         Email: registeredEmail,
-        Code: codeInput.value.trim(),
+        Code: codeValue,
         Username: "dummy",
         Password: "dummy"
     };
@@ -109,11 +123,12 @@ async function verifyCode() {
         });
 
         if (response.ok) {
-            alert("✅ E-posta doğrulandı! Giriş sayfasına yönlendiriliyorsunuz...");
+            alert("Doğrulandı! Giriş yapabilirsiniz.");
+            localStorage.removeItem("registeredEmail");
             window.location.href = "login.html";
         } else {
             const errorText = await response.text();
-            alert("❌ Hata: " + errorText);
+            alert(errorText);
         }
     } catch (error) {
         alert("Sunucuya bağlanılamadı!");
@@ -125,14 +140,13 @@ async function loginUser() {
     const passwordInput = document.getElementById("login-password");
 
     if (!usernameInput.value.trim() || !passwordInput.value.trim()) {
-        alert("Lütfen Alanları Doldurunuz.");
+        alert("Alanları doldurun.");
         return;
     }
 
     const loginData = {
-        Username: usernameInput.value,
-        Password: passwordInput.value,
-        Email: "dummy@dummy.com"
+        Username: usernameInput.value.trim(),
+        Password: passwordInput.value
     };
 
     try {
@@ -144,40 +158,28 @@ async function loginUser() {
 
         if (response.ok) {
             const data = await response.json();
-
             if (data.token) {
                 localStorage.setItem("jwtToken", data.token);
-                localStorage.setItem("username", data.username || usernameInput.value);
-
-                alert("Giriş Başarılı! Yönlendiriliyorsunuz...");
+                localStorage.setItem("username", data.username);
                 window.location.href = "index.html";
-            } else {
-                alert("Sistemsel bir hata oluştu: Token alınamadı.");
             }
         } else {
             const errorMsg = await response.text();
-            alert("❌ Giriş Başarısız: " + errorMsg);
+            alert(errorMsg);
         }
     } catch (error) {
-        alert("Sunucuya bağlanılamadı!");
+        alert("Bağlantı hatası.");
     }
 }
 
 window.onload = function () {
     if (document.getElementById("googleButtonContainer")) {
         const isRegisterPage = window.location.href.includes('register');
-
         google.accounts.id.initialize({
             client_id: "787940789409-k70mn4qf4fatqgsjnlr3h7fn8dj7bklt.apps.googleusercontent.com",
             callback: isRegisterPage ? handleGoogleRegister : handleGoogleLogin
         });
-
         renderGoogleButton();
-
-        window.addEventListener('resize', () => {
-            clearTimeout(window.resizeTimer);
-            window.resizeTimer = setTimeout(renderGoogleButton, 200);
-        });
     }
 };
 
@@ -185,10 +187,8 @@ function renderGoogleButton() {
     const container = document.getElementById("googleButtonContainer");
     if (container && window.google) {
         container.innerHTML = "";
-
         const isDarkMode = document.documentElement.classList.contains('dark');
         const btnWidth = container.offsetWidth || 340;
-
         google.accounts.id.renderButton(
             container,
             { theme: isDarkMode ? "filled_black" : "outline", size: "large", width: btnWidth, text: "continue_with" }
@@ -200,9 +200,7 @@ async function handleGoogleLogin(response) {
     try {
         const res = await fetch(`${apiUrl}/Auth/google-login`, {
             method: "POST",
-            headers: {
-                "Content-Type": "application/json"
-            },
+            headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ Token: response.credential })
         });
 
@@ -213,7 +211,7 @@ async function handleGoogleLogin(response) {
             window.location.href = "index.html";
         } else {
             const err = await res.text();
-            alert("❌ " + err);
+            alert(err);
         }
     } catch (error) {
         alert("Bağlantı hatası oluştu.");
@@ -224,9 +222,7 @@ async function handleGoogleRegister(response) {
     try {
         const res = await fetch(`${apiUrl}/Auth/google-register`, {
             method: "POST",
-            headers: {
-                "Content-Type": "application/json"
-            },
+            headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ Token: response.credential })
         });
 
@@ -237,7 +233,7 @@ async function handleGoogleRegister(response) {
             window.location.href = "index.html";
         } else {
             const err = await res.text();
-            alert("❌ " + err);
+            alert(err);
         }
     } catch (error) {
         alert("Bağlantı hatası oluştu.");

@@ -15,6 +15,16 @@
         .theme-transition {
             transition: background-color 0.2s smooth, color 0.2s smooth;
         }
+
+        input::-webkit-outer-spin-button,
+        input::-webkit-inner-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+
+        input[type=number] {
+            -moz-appearance: textfield;
+        }
     </style>
     <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
@@ -106,6 +116,7 @@
             <div class="space-y-6">
                 <div class="form-group">
                     <input type="text" id="verify-code" maxlength="6"
+                        oninput="this.value = this.value.replace(/[^0-9]/g, '')"
                         class="theme-transition w-full bg-slate-50 dark:bg-[#2c2c2c] border border-slate-200 dark:border-slate-700 rounded-xl p-4 outline-none focus:ring-2 focus:ring-emerald-500 transition-all text-center text-4xl tracking-[0.5em] font-black text-slate-800 dark:text-white uppercase"
                         placeholder="______">
                 </div>

@@ -2,11 +2,14 @@ const apiUrl = "https://localhost:7133/api";
 let globalTasks = [];
 
 document.addEventListener("DOMContentLoaded", () => {
-    const username = localStorage.getItem("username");
-    if (username) {
-        const display = document.getElementById("userDisplay");
-        display.textContent = username;
-        display.title = username; 
+    const urlParams = new URLSearchParams(window.location.search);
+    const urlToken = urlParams.get('token');
+    const urlUser = urlParams.get('username');
+
+    if (urlToken && urlUser) {
+        localStorage.setItem('jwtToken', urlToken);
+        localStorage.setItem('username', urlUser);
+        window.history.replaceState({}, document.title, window.location.pathname);
     }
 
     const savedTheme = localStorage.getItem('theme');
@@ -21,18 +24,21 @@ document.addEventListener("DOMContentLoaded", () => {
         if (themeIcon) { themeIcon.textContent = '🌙'; themeIcon.style.color = '#fbbf24'; }
     }
 
-    if (window.location.pathname.includes("index.html") || window.location.pathname === "/") {
-        const token = localStorage.getItem("jwtToken");
-        if (!token) {
-            window.location.href = "login.html";
-        } else {
-            const userDisplay = document.getElementById("userDisplay");
-            const savedName = localStorage.getItem("username");
-            if (userDisplay && savedName) userDisplay.textContent = `👤 ${savedName}`;
-            getTasks();
-            getRecentActivities();
-        }
+    const token = localStorage.getItem("jwtToken");
+    if (!token) {
+        window.location.href = "login.html";
+        return;
     }
+
+    const username = localStorage.getItem("username");
+    const display = document.getElementById("userDisplay");
+    if (username && display) {
+        display.textContent = username;
+        display.title = username;
+    }
+
+    getTasks();
+    getRecentActivities();
 });
 
 function toggleTheme() {
@@ -192,7 +198,6 @@ async function addFriendByUsername() {
             resultDiv.innerHTML = `<span class="text-red-500">❌ ${errorText}</span>`;
         }
     } catch (error) {
-        console.error(error);
         resultDiv.innerHTML = '<span class="text-red-500">❌ Bağlantı hatası.</span>';
     }
 }
@@ -633,7 +638,7 @@ function renderTasks(tasks) {
                     <button class="p-1.5 rounded-lg text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-all" onclick="event.stopPropagation(); toggleBin(${tId})">🗑️</button>
                 ` : `
                     <button class="px-3 py-1.5 text-blue-500 border border-blue-500 rounded-lg text-xs font-bold hover:bg-blue-500 hover:text-white transition-all" onclick="event.stopPropagation(); toggleBin(${tId})">GERİ YÜKLE</button>
-                    <button class="px-3 py-1.5 text-red-500 border border-red-500 rounded-lg text-xs font-bold hover:bg-red-500 hover:text-white transition-all ml-2" onclick="event.stopPropagation(); deleteTask(${tId})">SİL</button>
+                    <button class="px-3 py-1.5 text-red-500 border border-red-500 rounded-lg text-xs font-bold hover:bg-red-50 hover:text-white transition-all ml-2" onclick="event.stopPropagation(); deleteTask(${tId})">SİL</button>
                 `}
             </div>
         `;
