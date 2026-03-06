@@ -1,14 +1,15 @@
-﻿using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.IdentityModel.Tokens;
-using System.IdentityModel.Tokens.Jwt;
+﻿using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
-using TaskManagerApi.Data;
-using TaskManagerApi.Models;
-using Google.Apis.Auth;
 using System.Text.Json;
+using Google.Apis.Auth;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
+using TaskManagerApi.Data;
 using TaskManagerApi.Dto;
+using TaskManagerApi.Models;
 
 namespace TaskManagerApi.Controllers
 {
@@ -16,13 +17,13 @@ namespace TaskManagerApi.Controllers
     [ApiController]
     public class AuthController : ControllerBase
     {
-        private readonly AppDbContext _context;
+        private readonly AppDbContext _dbContext;
         private readonly IConfiguration _configuration;
         private readonly HttpClient _httpClient;
 
         public AuthController(AppDbContext context, IConfiguration configuration, HttpClient httpClient)
         {
-            _context = context;
+            _dbContext = context;
             _configuration = configuration;
             _httpClient = httpClient;
         }
@@ -30,10 +31,10 @@ namespace TaskManagerApi.Controllers
         [HttpPost("register")]
         public async Task<IActionResult> Register([FromBody] UserRegistrationDto request)
         {
-            if (await _context.Users.AnyAsync(u => u.Email == request.Email))
+            if (await _dbContext.Users.AnyAsync(u => u.Email == request.Email))
                 return BadRequest("Bu e-posta adresi zaten kullanılıyor.");
 
-            if (await _context.Users.AnyAsync(u => u.Username == request.Username))
+            if (await _dbContext.Users.AnyAsync(u => u.Username == request.Username))
                 return BadRequest("Bu kullanıcı adı zaten kullanılıyor.");
 
             var user = new User
@@ -43,17 +44,55 @@ namespace TaskManagerApi.Controllers
                 Password = BCrypt.Net.BCrypt.HashPassword(request.Password)
             };
 
+            var verificationCode = new Random().Next(100000, 999999).ToString();
+
             var emailToken = new EmailToken
             {
                 Email = request.Email,
                 Username = request.Username,
                 Password = user.Password,
-                Code = new Random().Next(100000, 999999).ToString(),
+                Code = verificationCode,
                 ExpirationDate = DateTime.Now.AddMinutes(15)
             };
 
-            _context.EmailTokens.Add(emailToken);
-            await _context.SaveChangesAsync();
+            _dbContext.EmailTokens.Add(emailToken);
+            await _dbContext.SaveChangesAsync();
+
+            try
+            {
+                var senderEmail = _configuration["Email:Adress"];
+                var senderPass = _configuration["Email:Pass"];
+
+                var smtpClient = new System.Net.Mail.SmtpClient("smtp.gmail.com")
+                {
+                    Port = 587,
+                    Credentials = new System.Net.NetworkCredential(senderEmail, senderPass),
+                    EnableSsl = true,
+                    DeliveryMethod = System.Net.Mail.SmtpDeliveryMethod.Network,
+                    UseDefaultCredentials = false
+                };
+
+                var mailMessage = new System.Net.Mail.MailMessage
+                {
+                    From = new System.Net.Mail.MailAddress(senderEmail, "TaskManager"),
+                    Subject = "Hesap Doğrulama Kodu",
+                    Body = $"Hoş geldiniz {request.Username}," +
+                    $"\n\nHesabınızı aktifleştirmek için doğrulama kodunuz:\n\n{verificationCode}" +
+                    $"\n\nBu kod 15 dakika boyunca geçerlidir.",
+                    IsBodyHtml = false,
+                };
+
+                mailMessage.To.Add(request.Email);
+
+                await smtpClient.SendMailAsync(mailMessage);
+            }
+            catch
+            {
+                _dbContext.EmailTokens.Remove(emailToken);
+                await _dbContext.SaveChangesAsync();
+                return BadRequest("E-posta gönderilirken bir hata oluştu. Lütfen e-posta ayarlarınızı " +
+                    "veya adresinizi kontrol edin.");
+            }
 
             return Ok(new { message = "Kayıt başarılı. Lütfen e-postanızı doğrulayın." });
         }
@@ -61,7 +100,7 @@ namespace TaskManagerApi.Controllers
         [HttpPost("verify")]
         public async Task<IActionResult> Verify([FromBody] EmailToken request)
         {
-            var tokenRecord = await _context.EmailTokens.FirstOrDefaultAsync
+            var tokenRecord = await _dbContext.EmailTokens.FirstOrDefaultAsync
                 (t => t.Email == request.Email && t.Code == request.Code);
 
             if (tokenRecord == null)
@@ -77,9 +116,9 @@ namespace TaskManagerApi.Controllers
                 Password = tokenRecord.Password
             };
 
-            _context.Users.Add(user);
-            _context.EmailTokens.Remove(tokenRecord);
-            await _context.SaveChangesAsync();
+            _dbContext.Users.Add(user);
+            _dbContext.EmailTokens.Remove(tokenRecord);
+            await _dbContext.SaveChangesAsync();
 
             return Ok(new { message = "E-posta başarıyla doğrulandı." });
         }
@@ -87,7 +126,7 @@ namespace TaskManagerApi.Controllers
         [HttpPost("login")]
         public async Task<IActionResult> Login([FromBody] UserLoginDto request)
         {
-            var user = await _context.Users.FirstOrDefaultAsync(u => u.Username == request.Username);
+            var user = await _dbContext.Users.FirstOrDefaultAsync(u => u.Username == request.Username);
             if (user == null || !BCrypt.Net.BCrypt.Verify(request.Password, user.Password))
                 return BadRequest("Geçersiz kullanıcı adı veya şifre.");
 
@@ -106,7 +145,7 @@ namespace TaskManagerApi.Controllers
                 };
 
                 var payload = await GoogleJsonWebSignature.ValidateAsync(request.Token, settings);
-                var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == payload.Email);
+                var user = await _dbContext.Users.FirstOrDefaultAsync(u => u.Email == payload.Email);
 
                 if (user == null)
                     return BadRequest("Bu Google hesabı sistemimizde kayıtlı değil. Lütfen önce kayıt olun.");
@@ -131,7 +170,7 @@ namespace TaskManagerApi.Controllers
                 };
 
                 var payload = await GoogleJsonWebSignature.ValidateAsync(request.Token, settings);
-                var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == payload.Email);
+                var user = await _dbContext.Users.FirstOrDefaultAsync(u => u.Email == payload.Email);
 
                 if (user != null)
                     return BadRequest("Bu e-posta adresi zaten kayıtlı. Lütfen giriş yapın.");
@@ -143,8 +182,8 @@ namespace TaskManagerApi.Controllers
                     Password = BCrypt.Net.BCrypt.HashPassword(Guid.NewGuid().ToString())
                 };
 
-                _context.Users.Add(user);
-                await _context.SaveChangesAsync();
+                _dbContext.Users.Add(user);
+                await _dbContext.SaveChangesAsync();
 
                 var token = GenerateJwtToken(user);
                 return Ok(new { token = token, username = user.Username });
@@ -185,67 +224,35 @@ namespace TaskManagerApi.Controllers
         public async Task<IActionResult> MicrosoftCallback([FromQuery] string code, [FromQuery] string state)
         {
             if (string.IsNullOrEmpty(code)) return BadRequest("Kod alınamadı.");
-
             var clientId = _configuration["ClientId"];
             var clientSecret = _configuration["ClientSecret"];
             var tenantId = _configuration["TenantId"];
             var redirectUri = "https://localhost:7133/api/Auth/microsoft-callback";
 
             var tokenResponse = await _httpClient.PostAsync($"https://login.microsoftonline.com/{tenantId}" +
-                $"/oauth2/v2.0/token",
-            new FormUrlEncodedContent(new Dictionary<string, string>
-            {
-                    {"client_id", clientId},
-                    {"scope", "User.Read openid email profile"},
-                    {"code", code},
-                    {"redirect_uri", redirectUri},
-                    {"grant_type", "authorization_code"},
-                    {"client_secret", clientSecret}
-            }));
+                $"/oauth2/v2.0/token", new FormUrlEncodedContent(new Dictionary<string, string>
+                { { "client_id", clientId }, { "scope", "User.Read openid email profile" }, { "code", code },
+                    { "redirect_uri", redirectUri }, { "grant_type", "authorization_code" },
+                    { "client_secret", clientSecret } }));
 
             if (!tokenResponse.IsSuccessStatusCode) return BadRequest("Microsoft token alınamadı.");
 
             var tokenData = await tokenResponse.Content.ReadAsStringAsync();
-            var jsonDocument = JsonDocument.Parse(tokenData);
-            var accessToken = jsonDocument.RootElement.GetProperty("access_token").GetString();
-
+            var accessToken = JsonDocument.Parse(tokenData).RootElement.GetProperty("access_token").GetString();
             var requestMessage = new HttpRequestMessage(HttpMethod.Get, "https://graph.microsoft.com/v1.0/me");
             requestMessage.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue
                 ("Bearer", accessToken);
 
             var userResponse = await _httpClient.SendAsync(requestMessage);
-
-            if (!userResponse.IsSuccessStatusCode) return BadRequest("Kullanıcı bilgileri alınamadı.");
-
             var userData = await userResponse.Content.ReadAsStringAsync();
-            var userJson = JsonDocument.Parse(userData);
+            var userJson = JsonDocument.Parse(userData).RootElement;
+            var email = userJson.TryGetProperty("mail", out var m) && m.ValueKind != JsonValueKind.Null
+                ? m.GetString() : userJson.GetProperty("userPrincipalName").GetString();
 
-            var email = userJson.RootElement.TryGetProperty("mail", out var mailProp) 
-                && mailProp.ValueKind != JsonValueKind.Null
-                ? mailProp.GetString()
-                : userJson.RootElement.GetProperty("userPrincipalName").GetString();
+            var user = await _dbContext.Users.FirstOrDefaultAsync(u => u.Email == email);
 
-            var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == email);
-
-            if (state == "login" && user == null)
-            {
-                var errorHtml = @"
-                    <script>
-                        alert('Bu Microsoft hesabı sistemimizde kayıtlı değil. Lütfen önce kayıt olun.');
-                        window.location.href = 'http://127.0.0.1:5500/index.html';
-                    </script>";
-                return Content(errorHtml, "text/html");
-            }
-
-            if (state == "register" && user != null)
-            {
-                var errorHtml = @"
-                    <script>
-                        alert('Bu Microsoft hesabı zaten kayıtlı. Lütfen giriş yapın.');
-                        window.location.href = 'http://127.0.0.1:5500/index.html';
-                    </script>";
-                return Content(errorHtml, "text/html");
-            }
+            if (state == "login" && user == null) return Redirect("http://127.0.0.1:5500/register.html?error=notfound");
+            if (state == "register" && user != null) return Redirect("http://127.0.0.1:5500/login.html?error=exists");
 
             if (user == null)
             {
@@ -253,22 +260,53 @@ namespace TaskManagerApi.Controllers
                 {
                     Username = email.Split('@')[0],
                     Email = email,
-                    Password = BCrypt.Net.BCrypt.HashPassword(Guid.NewGuid().ToString())
+                    Password =
+                    BCrypt.Net.BCrypt.HashPassword(Guid.NewGuid().ToString())
                 };
-                _context.Users.Add(user);
-                await _context.SaveChangesAsync();
+
+                _dbContext.Users.Add(user);
+                await _dbContext.SaveChangesAsync();
             }
 
             var jwt = GenerateJwtToken(user);
+            return Redirect($"http://127.0.0.1:5500/index.html?token={jwt}&username={user.Username}");
+        }
 
-            var html = $@"
-                <script>
-                    localStorage.setItem('jwtToken', '{jwt}');
-                    localStorage.setItem('username', '{user.Username}');
-                    window.location.href = 'http://127.0.0.1:5500/index.html';
-                </script>";
+        [Authorize]
+        [HttpDelete("delete")]
+        public async Task<IActionResult> DeleteAccount()
+        {
+            var userIdString = User.FindFirst("UserId")?.Value;
 
-            return Content(html, "text/html");
+            if (string.IsNullOrEmpty(userIdString) || !int.TryParse(userIdString, out int userId))
+            {
+                return Unauthorized();
+            }
+
+            var user = await _dbContext.Users.FindAsync(userId);
+
+            if (user == null)
+            {
+                return NotFound("Sistem Hatası.");
+            }
+
+            var taskAssigns = await _dbContext.TaskAssign.Where(a => a.UserId == userId).ToListAsync();
+
+            if (taskAssigns.Any()) _dbContext.TaskAssign.RemoveRange(taskAssigns);
+
+            var tasks = await _dbContext.TaskItems.Where(t => t.TokenId == userIdString).ToListAsync();
+
+            if (tasks.Any()) _dbContext.TaskItems.RemoveRange(tasks);
+
+            var friends = await _dbContext.FriendSystem.Where(f=>f.ReceiverId == userId || f.RequesterId == userId)
+                .ToListAsync();
+
+            if(friends.Any()) _dbContext.FriendSystem.RemoveRange(friends);
+
+            _dbContext.Users.Remove(user);
+            await _dbContext.SaveChangesAsync();
+
+            return Ok(new { message = "Hesap Başarıyla Silindi." });
         }
 
         private string GenerateJwtToken(User user)
@@ -286,7 +324,7 @@ namespace TaskManagerApi.Controllers
                 issuer: _configuration["Jwt:Issuer"],
                 audience: _configuration["Jwt:Audience"],
                 claims: claims,
-                expires: DateTime.Now.AddDays(7),
+                expires: DateTime.Now.AddHours(5.30),
                 signingCredentials: credentials);
 
             return new JwtSecurityTokenHandler().WriteToken(token);

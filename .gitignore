@@ -7,5 +7,4 @@ appsettings.Development.json
 Migrations/
 .json
 *.json
-microsoft-credentials.json
 google-credentials.json

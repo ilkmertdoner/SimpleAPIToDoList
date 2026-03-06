@@ -138,8 +138,8 @@ namespace TaskManagerApi.Controllers
         public async Task<IActionResult> GetDeletedTasks()
         {
             var currentUserId = GetUserIdFromHeader();
-            var deletedTasks = await _dbContext.TaskItems.Where(t => t.TokenId == currentUserId &&
-                t.isDeleted).ToListAsync();
+            var deletedTasks = await _dbContext.TaskItems.Where(t => t.TokenId == currentUserId && t.isDeleted)
+                .ToListAsync();
 
             return Ok(deletedTasks);
         }
