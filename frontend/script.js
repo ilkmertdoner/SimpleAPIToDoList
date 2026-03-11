@@ -1,5 +1,8 @@
 const apiUrl = "https://localhost:7133/api";
 let globalTasks = [];
+let myGroups = [];
+let currentGroupId = null;
+let currentGroupIsAdmin = false;
 
 document.addEventListener("DOMContentLoaded", () => {
     const urlParams = new URLSearchParams(window.location.search);
@@ -37,6 +40,7 @@ document.addEventListener("DOMContentLoaded", () => {
         display.title = username;
     }
 
+    loadGroups();
     getTasks();
     getRecentActivities();
 });
@@ -364,7 +368,82 @@ async function removeUser(taskId, userId, userName) {
     }
 }
 
-async function filterTasks(category) {
+async function loadGroups() {
+    try {
+        const res = await fetch(`${apiUrl}/Group/my-groups`, { headers: getHeaders() });
+        if (res.ok) {
+            myGroups = await res.json();
+            renderGroupsSidebar();
+            renderGroupsDropdown();
+        }
+    } catch (e) { console.error(e); }
+}
+
+function renderGroupsSidebar() {
+    const container = document.getElementById('groupListSidebar');
+    container.innerHTML = '';
+    myGroups.forEach(g => {
+        const gId = g.groupId || g.GroupId;
+        const gName = g.name || g.Name;
+        const isAdmin = g.isAdmin !== undefined ? g.isAdmin : g.IsAdmin;
+
+        const btn = document.createElement('button');
+        btn.className = `w-full flex items-center justify-between px-4 py-2.5 text-left rounded-xl text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#2c2c2c] transition-colors group-btn group-btn-${gId}`;
+        btn.onclick = () => selectGroup(gId, gName, isAdmin);
+        btn.innerHTML = `<div class="flex items-center gap-3 truncate"><span>📁</span> <span class="truncate">${gName}</span></div>`;
+        container.appendChild(btn);
+    });
+}
+
+function renderGroupsDropdown() {
+    const select = document.getElementById('taskGroupSelect');
+    select.innerHTML = '<option value="">👤 Kişisel Görev</option>';
+    myGroups.forEach(g => {
+        const gId = g.groupId || g.GroupId;
+        const gName = g.name || g.Name;
+        select.innerHTML += `<option value="${gId}">📁 ${gName}</option>`;
+    });
+    if (currentGroupId) {
+        select.value = currentGroupId;
+    }
+}
+
+function selectGroup(id, name, isAdmin) {
+    currentGroupId = id;
+    currentGroupIsAdmin = isAdmin;
+
+    document.getElementById('pageTitle').textContent = name;
+    document.getElementById('groupSettingsBtn').classList.remove('hidden');
+    document.getElementById('taskGroupSelect').value = id;
+
+    const navButtons = document.querySelectorAll('#sidebar button');
+    navButtons.forEach(btn => {
+        btn.classList.remove('group-active', 'bg-blue-50', 'dark:bg-blue-900/20', 'text-blue-600', 'dark:text-blue-400', 'font-medium');
+        if (!btn.className.includes('text-left')) return;
+        if (!btn.classList.contains('group-btn') && btn.id !== 'nav-personal') {
+            btn.classList.add('text-slate-600', 'dark:text-slate-300');
+        } else if (btn.classList.contains('group-btn')) {
+            btn.classList.add('text-slate-600', 'dark:text-slate-300');
+        }
+    });
+
+    const clickedBtn = document.querySelector(`.group-btn-${id}`);
+    if (clickedBtn) {
+        clickedBtn.classList.remove('text-slate-600', 'dark:text-slate-300');
+        clickedBtn.classList.add('group-active', 'bg-blue-50', 'dark:bg-blue-900/20', 'text-blue-600', 'dark:text-blue-400', 'font-medium');
+    }
+
+    if (window.innerWidth < 768) toggleSidebar();
+
+    getTasks();
+}
+
+function filterTasks(category) {
+    currentGroupId = null;
+    currentGroupIsAdmin = false;
+    document.getElementById('groupSettingsBtn').classList.add('hidden');
+    document.getElementById('taskGroupSelect').value = "";
+
     const title = document.getElementById('pageTitle');
     const sidebar = document.getElementById('sidebar');
     const overlay = document.getElementById('sidebarOverlay');
@@ -373,8 +452,13 @@ async function filterTasks(category) {
         btn.className = "w-full flex items-center gap-3 px-4 py-2.5 text-left rounded-xl text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#2c2c2c] transition-colors";
     });
 
-    const activeBtn = document.querySelector(`#sidebar button[onclick="filterTasks('${category}')"]`);
-    if (activeBtn) activeBtn.className = "w-full flex items-center gap-3 px-4 py-2.5 text-left rounded-xl bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 font-medium hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors";
+    document.querySelectorAll('.group-btn').forEach(btn => {
+        btn.classList.remove('group-active', 'bg-blue-50', 'dark:bg-blue-900/20', 'text-blue-600', 'dark:text-blue-400', 'font-medium');
+        btn.classList.add('text-slate-600', 'dark:text-slate-300');
+    });
+
+    const activeBtn = document.querySelector(`#sidebar button[onclick="filterTasks('${category}', null)"]`) || document.querySelector(`#sidebar button[onclick="filterTasks('${category}')"]`) || document.getElementById('nav-personal');
+    if (activeBtn) activeBtn.className = "w-full flex items-center gap-3 px-4 py-2.5 text-left rounded-xl bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 font-medium hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors group-active";
 
     if (window.innerWidth < 768) {
         if (sidebar) sidebar.classList.add('-translate-x-full');
@@ -384,7 +468,7 @@ async function filterTasks(category) {
     const filters = document.querySelectorAll('.filter-control');
     switch (category) {
         case 'all':
-            title.textContent = "Tüm Görevler";
+            title.textContent = "Kişisel Görevlerim";
             filters.forEach(f => f.disabled = false);
             getTasks();
             break;
@@ -415,13 +499,14 @@ async function getTasks() {
     const statusVal = document.getElementById("statusFilter")?.value || "all";
     const priorityVal = document.getElementById("priorityFilter")?.value || "";
     const sortOrder = document.getElementById("sortOrder")?.value || "default";
-    const pageTitle = document.getElementById('pageTitle') ? document.getElementById('pageTitle').textContent : "Tüm Görevler";
+    const pageTitle = document.getElementById('pageTitle') ? document.getElementById('pageTitle').textContent : "Kişisel Görevlerim";
 
     if (pageTitle.includes("Favoriler")) { fetchAndRender(`${apiUrl}/Tasks/favorites`); return; }
     if (pageTitle.includes("Çöp Kutusu")) { fetchAndRender(`${apiUrl}/Tasks/bin`); return; }
 
     let queryUrl = `${apiUrl}/Tasks?search=${searchVal}&status=${statusVal}`;
     if (priorityVal) queryUrl += `&priority=${priorityVal}`;
+    if (currentGroupId) queryUrl += `&groupId=${currentGroupId}`;
 
     try {
         const response = await fetch(queryUrl, { method: "GET", headers: getHeaders() });
@@ -450,7 +535,7 @@ async function getTasks() {
 
 async function toggleSubtask(event, taskId, lineIndex) {
     event.stopPropagation();
-    const task = globalTasks.find(t => (t.id || t.Id) === taskId);
+    const task = globalTasks.find(t => (t.id || t.Id || t.taskId || t.TaskId) === taskId);
     if (!task) return;
 
     let desc = task.description || task.Description || "";
@@ -469,18 +554,19 @@ async function toggleSubtask(event, taskId, lineIndex) {
 
     const tTitle = task.title || task.Title;
     const tStatus = task.isCompleted !== undefined ? task.isCompleted : task.IsCompleted;
-    const tFav = task.isFavorite || task.IsFavorite;
+    const tFav = task.isFavorite === true || task.IsFavorite === true;
     const tPriority = task.priority !== undefined ? task.priority : task.Priority;
     const tDate = task.dueDate || task.DueDate;
     const tEventId = task.googleCalendarEventId || task.GoogleCalendarEventId || null;
     const tMsEventId = task.microsoftCalendarEventId || task.MicrosoftCalendarEventId || null;
+    const tGroupId = task.groupId || task.GroupId || null;
 
     try {
         await fetch(`${apiUrl}/Tasks/${taskId}`, {
             method: "PUT",
             headers: getHeaders(),
             body: JSON.stringify({
-                Id: taskId, Title: tTitle, Description: newDesc, IsCompleted: tStatus, isFavorite: tFav, Priority: tPriority, DueDate: tDate, GoogleCalendarEventId: tEventId, MicrosoftCalendarEventId: tMsEventId
+                Id: taskId, Title: tTitle, Description: newDesc, IsCompleted: tStatus, isFavorite: tFav, Priority: tPriority, DueDate: tDate, GroupId: tGroupId, GoogleCalendarEventId: tEventId, MicrosoftCalendarEventId: tMsEventId
             })
         });
         getTasks();
@@ -498,8 +584,10 @@ function renderTasks(tasks) {
     const searchVal = document.getElementById("searchInput")?.value || "";
     const statusVal = document.getElementById("statusFilter")?.value || "all";
     const priorityVal = document.getElementById("priorityFilter")?.value || "";
-    const pageTitle = document.getElementById('pageTitle') ? document.getElementById('pageTitle').textContent : "Tüm Görevler";
-    const canDrag = pageTitle === "Tüm Görevler" && searchVal === "" && statusVal === "all" && priorityVal === "";
+    const pageTitle = document.getElementById('pageTitle') ? document.getElementById('pageTitle').textContent : "Kişisel Görevlerim";
+
+    const isBinPage = pageTitle.includes("Çöp Kutusu");
+    const canDrag = !pageTitle.includes("Favoriler") && !isBinPage && searchVal === "" && statusVal === "all" && priorityVal === "";
 
     if (globalTasks.length === 0) {
         list.innerHTML = '<div class="text-center text-slate-500 py-10">Görev bulunamadı.</div>';
@@ -511,7 +599,7 @@ function renderTasks(tasks) {
     const now = new Date();
 
     globalTasks.forEach(task => {
-        const tId = task.id || task.Id;
+        const tId = task.id || task.Id || task.taskId || task.TaskId;
         const tTitle = task.title || task.Title;
         let tDesc = task.description || task.Description || "";
         if (tDesc === "undefined" || tDesc === "null") tDesc = "";
@@ -519,8 +607,10 @@ function renderTasks(tasks) {
         const tPriority = task.priority !== undefined ? task.priority : task.Priority;
         const tDate = task.dueDate || task.DueDate;
         const tIsCompleted = task.isCompleted !== undefined ? task.isCompleted : task.IsCompleted;
-        const tIsFavorite = task.isFavorite || task.IsFavorite || false;
-        const tIsDeleted = task.isDeleted || task.IsDeleted || false;
+        const tIsFavorite = task.isFavorite === true || task.IsFavorite === true;
+
+        const tIsDeleted = task.isDeleted === true || task.IsDeleted === true || isBinPage;
+        const tGroupId = task.groupId || task.GroupId || null;
 
         const tAssignees = task.assignees || task.Assignees || task.assign || task.Assign || [];
 
@@ -528,6 +618,13 @@ function renderTasks(tasks) {
         if (tPriority === 1) priorityBadge = `<span class="px-2 py-0.5 rounded text-xs font-bold bg-blue-100 text-blue-600">Düşük</span>`;
         else if (tPriority === 2) priorityBadge = `<span class="px-2 py-0.5 rounded text-xs font-bold bg-yellow-100 text-yellow-600">Orta</span>`;
         else if (tPriority === 3) priorityBadge = `<span class="px-2 py-0.5 rounded text-xs font-bold bg-red-100 text-red-600">Yüksek</span>`;
+
+        let groupBadge = "";
+        if (tGroupId && !currentGroupId) {
+            const foundGroup = myGroups.find(g => (g.groupId || g.GroupId) === tGroupId);
+            const gName = foundGroup ? (foundGroup.name || foundGroup.Name) : "Grup";
+            groupBadge = `<span class="px-2 py-0.5 rounded text-xs font-bold bg-purple-100 text-purple-600 flex items-center gap-1">📁 ${gName}</span>`;
+        }
 
         let dateBadge = "";
         let borderClass = "border-slate-200 dark:border-slate-700";
@@ -557,7 +654,7 @@ function renderTasks(tasks) {
         }
 
         let assigneeHtml = "";
-        if (tAssignees.length > 0) {
+        if (!tGroupId && tAssignees.length > 0) {
             assigneeHtml = `<div class="flex flex-wrap space-x-0.5">`;
             tAssignees.forEach(a => {
                 const uId = a.id || a.Id || a.userId || a.UserId;
@@ -613,12 +710,13 @@ function renderTasks(tasks) {
 
         li.innerHTML = `
             <button class="w-6 h-6 rounded-full border-2 flex items-center justify-center text-xs font-bold transition-all shrink-0 mt-0.5 ${checkClass}" 
-                    onclick="event.stopPropagation(); toggleStatus(${tId}, '${safeTitle}', '${safeDescRaw}', ${!tIsCompleted}, ${tIsFavorite}, ${tPriority}, '${safeDate}')">
+                    onclick="event.stopPropagation(); toggleStatus(${tId})">
                 ${tIsCompleted ? '✔' : ''}
             </button>
             <div class="flex-grow min-w-0 flex flex-col mx-4">
                 <div class="flex items-center gap-2 mb-1">
                     ${priorityBadge}
+                    ${groupBadge}
                     ${dateBadge}
                 </div>
                 <span class="block font-bold truncate text-lg ${titleStyle}">${tTitle}</span>
@@ -627,14 +725,14 @@ function renderTasks(tasks) {
                 </div>
                 <div class="flex items-center gap-1 mt-2">
                     ${assigneeHtml}
-                    ${!tIsDeleted ? `<button onclick="event.stopPropagation(); openAssignModal(${tId})" class="w-7 h-7 rounded-full bg-slate-50 dark:bg-slate-800 border border-dashed border-slate-300 dark:border-slate-600 flex items-center justify-center text-slate-500 hover:text-blue-500 hover:border-blue-500 transition-all text-sm shrink-0" title="Göreve Kişi Ekle">+</button>` : ''}
+                    ${!tIsDeleted && !tGroupId ? `<button onclick="event.stopPropagation(); openAssignModal(${tId})" class="w-7 h-7 rounded-full bg-slate-50 dark:bg-slate-800 border border-dashed border-slate-300 dark:border-slate-600 flex items-center justify-center text-slate-500 hover:text-blue-500 hover:border-blue-500 transition-all text-sm shrink-0" title="Göreve Kişi Ekle">+</button>` : ''}
                 </div>
             </div>
             <div class="flex items-center shrink-0 gap-1">
                 ${!tIsDeleted ? `
                     <button class="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition-all" onclick="event.stopPropagation(); toggleFavorite(${tId})">${starIcon}</button>
                     <div class="w-px h-6 bg-slate-200 dark:bg-slate-700 mx-1"></div>
-                    <button class="p-1.5 rounded-lg text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-900/20 transition-all" onclick="event.stopPropagation(); startEditMode('${tId}', '${safeTitle}', '${safeDescRaw}', ${tIsCompleted}, ${tIsFavorite}, ${tPriority}, '${safeDate}')">✏️</button>
+                    <button class="p-1.5 rounded-lg text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-900/20 transition-all" onclick="event.stopPropagation(); startEditMode(${tId})">✏️</button>
                     <button class="p-1.5 rounded-lg text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-all" onclick="event.stopPropagation(); toggleBin(${tId})">🗑️</button>
                 ` : `
                     <button class="px-3 py-1.5 text-blue-500 border border-blue-500 rounded-lg text-xs font-bold hover:bg-blue-500 hover:text-white transition-all" onclick="event.stopPropagation(); toggleBin(${tId})">GERİ YÜKLE</button>
@@ -649,14 +747,68 @@ function renderTasks(tasks) {
     renderCalendar(globalTasks);
 }
 
-async function toggleFavorite(id) { await fetch(`${apiUrl}/Tasks/favorites/${id}`, { method: "PUT", headers: getHeaders() }); getTasks(); }
-async function toggleBin(id) { await fetch(`${apiUrl}/Tasks/bin/${id}`, { method: "PUT", headers: getHeaders() }); getTasks(); }
-async function deleteTask(id) { if (confirm("Kalıcı silinsin mi?")) { await fetch(`${apiUrl}/Tasks/${id}`, { method: "DELETE", headers: getHeaders() }); getTasks(); } }
+async function toggleFavorite(id) {
+    try {
+        const response = await fetch(`${apiUrl}/Tasks/favorites/${id}`, {
+            method: "PUT",
+            headers: getHeaders()
+        });
+
+        if (response.ok) {
+            const data = await response.json();
+            const newFavState = data.isFavorite !== undefined ? data.isFavorite : data.IsFavorite;
+
+            const taskIndex = globalTasks.findIndex(t => (t.id || t.Id || t.taskId || t.TaskId) === id);
+            if (taskIndex > -1) {
+                globalTasks[taskIndex].isFavorite = newFavState;
+                globalTasks[taskIndex].IsFavorite = newFavState;
+            }
+
+            const pageTitle = document.getElementById('pageTitle') ? document.getElementById('pageTitle').textContent : "";
+            if (pageTitle.includes("Favoriler") && newFavState === false) {
+                getTasks();
+            } else {
+                renderTasks(globalTasks);
+            }
+        }
+    } catch (error) {
+        console.error(error);
+    }
+}
+
+async function toggleBin(id) {
+    const taskIndex = globalTasks.findIndex(t => (t.id || t.Id || t.taskId || t.TaskId) === id);
+    if (taskIndex > -1) {
+        globalTasks.splice(taskIndex, 1);
+        renderTasks(globalTasks);
+    }
+
+    try {
+        const res = await fetch(`${apiUrl}/Tasks/bin/${id}`, { method: "PUT", headers: getHeaders() });
+        if (!res.ok) {
+            const err = await res.text();
+            alert(`Hata: ${err}`);
+            getTasks();
+        }
+    } catch (e) { console.error(e); getTasks(); }
+}
+
+async function deleteTask(id) {
+    if (confirm("Kalıcı silinsin mi?")) {
+        try {
+            const res = await fetch(`${apiUrl}/Tasks/${id}`, { method: "DELETE", headers: getHeaders() });
+            if (!res.ok) {
+                const err = await res.text();
+                alert(`Hata: ${err}`);
+            }
+            getTasks();
+        } catch (e) { console.error(e); }
+    }
+}
 
 let isEditing = false;
 let editingId = null;
 let editingStatus = false;
-let editingFavorite = false;
 let editingEventId = null;
 let editingMsEventId = null;
 
@@ -666,6 +818,7 @@ async function saveTask() {
     const priorityInput = document.getElementById("taskPriority");
     const dateOnlyInput = document.getElementById("taskDateInput");
     const timeOnlyInput = document.getElementById("taskTimeInput");
+    const groupSelect = document.getElementById("taskGroupSelect");
 
     if (!titleInput.value.trim()) {
         alert("Başlık girin!");
@@ -678,13 +831,22 @@ async function saveTask() {
         finalDueDate = `${dateOnlyInput.value}T${timePart.length === 5 ? timePart + ":00" : timePart}`;
     }
 
+    let currentFav = false;
+    if (isEditing) {
+        const task = globalTasks.find(t => (t.id || t.Id || t.taskId || t.TaskId) == editingId);
+        if (task) {
+            currentFav = task.isFavorite === true || task.IsFavorite === true;
+        }
+    }
+
     const taskData = {
         Title: titleInput.value,
         Description: descInput.value,
         Priority: parseInt(priorityInput.value) || 0,
         DueDate: finalDueDate,
         IsCompleted: isEditing ? editingStatus : false,
-        isFavorite: isEditing ? editingFavorite : false,
+        isFavorite: currentFav,
+        GroupId: groupSelect.value ? parseInt(groupSelect.value) : null,
         GoogleCalendarEventId: isEditing ? editingEventId : null,
         MicrosoftCalendarEventId: isEditing ? editingMsEventId : null
     };
@@ -714,39 +876,70 @@ async function saveTask() {
     }
 }
 
-async function toggleStatus(id, title, desc, status, isFav, priority, dueDate) {
-    const task = globalTasks.find(t => (t.id || t.Id) === id);
-    const eventId = task ? (task.googleCalendarEventId || task.GoogleCalendarEventId) : null;
-    const msEventId = task ? (task.microsoftCalendarEventId || task.MicrosoftCalendarEventId) : null;
+async function toggleStatus(id) {
+    const taskIndex = globalTasks.findIndex(t => (t.id || t.Id || t.taskId || t.TaskId) === id);
+    if (taskIndex === -1) return;
 
-    await fetch(`${apiUrl}/Tasks/${id}`, {
-        method: "PUT",
-        headers: getHeaders(),
-        body: JSON.stringify({
-            Id: id, Title: title, Description: desc, IsCompleted: status, isFavorite: isFav, Priority: priority, DueDate: dueDate && dueDate !== "null" ? dueDate : null, GoogleCalendarEventId: eventId, MicrosoftCalendarEventId: msEventId
-        })
-    });
-    getTasks();
-    getRecentActivities();
+    const task = globalTasks[taskIndex];
+    const currentStatus = task.isCompleted !== undefined ? task.isCompleted : task.IsCompleted;
+    const newStatus = !currentStatus;
+
+    task.isCompleted = newStatus;
+    task.IsCompleted = newStatus;
+    renderTasks(globalTasks);
+
+    const title = task.title || task.Title;
+    const desc = task.description || task.Description || "";
+    const isFav = task.isFavorite === true || task.IsFavorite === true;
+    const priority = task.priority !== undefined ? task.priority : task.Priority;
+    const dueDate = task.dueDate || task.DueDate;
+    const eventId = task.googleCalendarEventId || task.GoogleCalendarEventId || null;
+    const msEventId = task.microsoftCalendarEventId || task.MicrosoftCalendarEventId || null;
+    const tGroupId = task.groupId || task.GroupId || null;
+
+    try {
+        await fetch(`${apiUrl}/Tasks/${id}`, {
+            method: "PUT",
+            headers: getHeaders(),
+            body: JSON.stringify({
+                Id: id, Title: title, Description: desc, IsCompleted: newStatus, isFavorite: isFav, Priority: priority, DueDate: dueDate && dueDate !== "null" ? dueDate : null, GroupId: tGroupId, GoogleCalendarEventId: eventId, MicrosoftCalendarEventId: msEventId
+            })
+        });
+        getRecentActivities();
+    } catch (e) {
+        console.error(e);
+    }
 }
 
-function startEditMode(id, title, desc, status, isFav, priority, dueDate) {
-    const task = globalTasks.find(t => (t.id || t.Id) == id);
-    editingEventId = task ? (task.googleCalendarEventId || task.GoogleCalendarEventId) : null;
-    editingMsEventId = task ? (task.microsoftCalendarEventId || task.MicrosoftCalendarEventId) : null;
+function startEditMode(id) {
+    const task = globalTasks.find(t => (t.id || t.Id || t.taskId || t.TaskId) === id);
+    if (!task) return;
+
+    editingEventId = task.googleCalendarEventId || task.GoogleCalendarEventId || null;
+    editingMsEventId = task.microsoftCalendarEventId || task.MicrosoftCalendarEventId || null;
+    const tPriority = task.priority !== undefined ? task.priority : (task.Priority || 2);
 
     isEditing = true;
     editingId = id;
-    editingStatus = status;
-    editingFavorite = isFav;
-    document.getElementById("taskTitle").value = title;
-    document.getElementById("taskDesc").value = desc === "undefined" ? "" : desc;
-    document.getElementById("taskPriority").value = priority || "2";
+    editingStatus = task.isCompleted !== undefined ? task.isCompleted : task.IsCompleted;
+
+    document.getElementById("taskTitle").value = task.title || task.Title;
+    const desc = task.description || task.Description;
+    document.getElementById("taskDesc").value = (desc === "undefined" || !desc) ? "" : desc;
+    document.getElementById("taskPriority").value = tPriority;
+
+    const dueDate = task.dueDate || task.DueDate;
     if (dueDate && dueDate !== "null") {
         const parts = dueDate.split('T');
         document.getElementById("taskDateInput").value = parts[0];
         if (parts[1]) document.getElementById("taskTimeInput").value = parts[1].substring(0, 5);
+    } else {
+        document.getElementById("taskDateInput").value = "";
+        document.getElementById("taskTimeInput").value = "";
     }
+
+    document.getElementById("taskGroupSelect").value = task.groupId || task.GroupId || "";
+
     const saveBtn = document.getElementById("saveBtn");
     const cancelBtn = document.getElementById("cancelBtn");
     saveBtn.textContent = "GÜNCELLE";
@@ -765,6 +958,11 @@ function resetForm() {
     document.getElementById("taskPriority").value = "2";
     document.getElementById("taskDateInput").value = "";
     document.getElementById("taskTimeInput").value = "";
+    if (currentGroupId) {
+        document.getElementById("taskGroupSelect").value = currentGroupId;
+    } else {
+        document.getElementById("taskGroupSelect").value = "";
+    }
     const saveBtn = document.getElementById("saveBtn");
     const cancelBtn = document.getElementById("cancelBtn");
     saveBtn.textContent = "EKLE";
@@ -798,7 +996,10 @@ function updateSidebarStats(tasks) {
     const textEl = document.getElementById('successRateText');
     const barEl = document.getElementById('successRateBar');
     if (!textEl || !barEl) return;
-    const activeTasks = tasks.filter(t => !(t.isDeleted || t.IsDeleted));
+    const activeTasks = tasks.filter(t => {
+        const isDel = t.isDeleted === true || t.IsDeleted === true;
+        return !isDel;
+    });
     const total = activeTasks.length;
     if (total === 0) { textEl.innerText = "0%"; barEl.style.width = "0%"; return; }
     const completed = activeTasks.filter(t => t.isCompleted || t.IsCompleted).length;
@@ -829,7 +1030,7 @@ function renderCalendar(tasks) {
     const taskCounts = {};
     tasks.forEach(t => {
         const dateStr = t.dueDate || t.DueDate;
-        const isDel = t.isDeleted || t.IsDeleted;
+        const isDel = t.isDeleted === true || t.IsDeleted === true;
         if (dateStr && !isDel) {
             const d = new Date(dateStr);
             if (d.getFullYear() === year && d.getMonth() === month) {
@@ -891,7 +1092,7 @@ function openDailyModal(year, month, day) {
     content.innerHTML = '';
 
     const dayTasks = globalTasks.filter(t => {
-        const isDel = t.isDeleted || t.IsDeleted;
+        const isDel = t.isDeleted === true || t.IsDeleted === true;
         if (isDel) return false;
         const dateStr = t.dueDate || t.DueDate;
         if (!dateStr) return false;
@@ -947,4 +1148,207 @@ async function deleteAccount() {
     } else if (confirmText !== null) {
         alert("Hatalı giriş yaptınız, silme işlemi iptal edildi.");
     }
+}
+
+function openCreateGroupModal() {
+    document.getElementById('createGroupModal').classList.remove('hidden');
+    document.getElementById('groupNameInput').value = '';
+    document.getElementById('groupDescInput').value = '';
+}
+
+function closeCreateGroupModal() {
+    document.getElementById('createGroupModal').classList.add('hidden');
+}
+
+async function submitCreateGroup() {
+    const name = document.getElementById('groupNameInput').value.trim();
+    const desc = document.getElementById('groupDescInput').value.trim();
+    if (!name) { alert("Grup adı zorunludur."); return; }
+
+    try {
+        const response = await fetch(`${apiUrl}/Group/create`, {
+            method: "POST",
+            headers: getHeaders(),
+            body: JSON.stringify({ Name: name, Description: desc })
+        });
+
+        if (response.ok) {
+            closeCreateGroupModal();
+            loadGroups();
+            getRecentActivities();
+        } else {
+            const err = await response.text();
+            alert(`Hata: ${err}`);
+        }
+    } catch (e) { console.error(e); }
+}
+
+async function openGroupSettings() {
+    if (!currentGroupId) return;
+
+    const group = myGroups.find(g => (g.groupId || g.GroupId) === currentGroupId);
+    if (!group) return;
+
+    document.getElementById('settingsGroupName').textContent = group.name || group.Name;
+    document.getElementById('settingsGroupDesc').textContent = group.description || group.Description;
+
+    const delBtn = document.getElementById('deleteGroupBtn');
+    const isAdmin = group.isAdmin !== undefined ? group.isAdmin : group.IsAdmin;
+
+    if (isAdmin) {
+        delBtn.classList.remove('hidden');
+    } else {
+        delBtn.classList.add('hidden');
+    }
+
+    const select = document.getElementById('groupAddMemberSelect');
+    select.innerHTML = '<option value="">Gruba eklenecek arkadaşını seç...</option>';
+    const membersList = document.getElementById('groupMembersList');
+    membersList.innerHTML = '<div class="text-center text-slate-500 py-4">Üyeler yükleniyor...</div>';
+
+    try {
+        const response = await fetch(`${apiUrl}/Friend/friendlist`, { headers: getHeaders() });
+        if (response.ok) {
+            const friends = await response.json();
+            friends.forEach(f => {
+                const fName = f.friendName || f.FriendName;
+                select.innerHTML += `<option value="${fName}">@${fName}</option>`;
+            });
+        }
+    } catch (e) {
+        console.error(e);
+    }
+
+    document.getElementById('groupSettingsModal').classList.remove('hidden');
+
+    try {
+        const memRes = await fetch(`${apiUrl}/Group/${currentGroupId}/members`, { headers: getHeaders() });
+        if (memRes.ok) {
+            const members = await memRes.json();
+            membersList.innerHTML = '';
+            const myUsername = localStorage.getItem("username");
+
+            members.forEach(m => {
+                const uId = m.userId || m.UserId;
+                const uName = m.username || m.Username;
+                const isMemAdmin = m.isAdmin !== undefined ? m.isAdmin : m.IsAdmin;
+
+                let actionsHtml = '';
+                if (isAdmin && uName !== myUsername) {
+                    actionsHtml = `
+                        <div class="flex gap-2">
+                            <button onclick="toggleGroupAdmin(${uId})" class="text-[10px] font-bold px-2 py-1 rounded ${isMemAdmin ? 'bg-amber-100 text-amber-700 hover:bg-amber-200' : 'bg-blue-100 text-blue-700 hover:bg-blue-200'} transition-all">${isMemAdmin ? 'Yetkiyi Al' : 'Admin Yap'}</button>
+                            <button onclick="kickGroupMember(${uId}, '${uName}')" class="text-[10px] font-bold px-2 py-1 rounded bg-red-100 text-red-700 hover:bg-red-200 transition-all">Çıkar</button>
+                        </div>
+                    `;
+                }
+
+                membersList.innerHTML += `
+                    <div class="flex justify-between items-center p-2 bg-white dark:bg-[#1e1e1e] border border-slate-200 dark:border-slate-700 rounded-lg mb-2">
+                        <div class="flex items-center gap-2">
+                            <div class="w-6 h-6 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-[10px] font-bold text-slate-600 dark:text-slate-300">${uName.charAt(0).toUpperCase()}</div>
+                            <span class="text-sm font-bold text-slate-700 dark:text-slate-300">@${uName} ${isMemAdmin ? '👑' : ''}</span>
+                        </div>
+                        ${actionsHtml}
+                    </div>
+                `;
+            });
+        } else {
+            membersList.innerHTML = '<div class="text-center text-red-500 py-4">Üyeleri görme yetkiniz yok.</div>';
+        }
+    } catch (e) {
+        console.error(e);
+        membersList.innerHTML = '<div class="text-center text-red-500 py-4">Üyeler yüklenemedi.</div>';
+    }
+}
+
+function closeGroupSettingsModal() {
+    document.getElementById('groupSettingsModal').classList.add('hidden');
+}
+
+async function addMemberToGroup() {
+    const username = document.getElementById('groupAddMemberSelect').value;
+    if (!username) { alert("Lütfen bir arkadaşınızı seçin."); return; }
+
+    try {
+        const response = await fetch(`${apiUrl}/Group/${currentGroupId}/add-member/${username}`, {
+            method: "POST",
+            headers: getHeaders()
+        });
+
+        if (response.ok) {
+            alert("Arkadaşınız gruba eklendi.");
+            closeGroupSettingsModal();
+            loadGroups();
+            setTimeout(openGroupSettings, 500);
+        } else {
+            const err = await response.text();
+            alert(`Hata: ${err}`);
+        }
+    } catch (e) { console.error(e); }
+}
+
+async function leaveGroup() {
+    if (!confirm("Bu gruptan ayrılmak istediğinize emin misiniz?")) return;
+
+    try {
+        const response = await fetch(`${apiUrl}/Group/${currentGroupId}/leave`, {
+            method: "DELETE",
+            headers: getHeaders()
+        });
+
+        if (response.ok) {
+            closeGroupSettingsModal();
+            filterTasks('all');
+            loadGroups();
+        } else {
+            const err = await response.text();
+            alert(`Hata: ${err}`);
+        }
+    } catch (e) { console.error(e); }
+}
+
+async function deleteGroup() {
+    if (!confirm("Bu grubu tamamen silmek istediğinize emin misiniz? Tüm görevler silinecektir!")) return;
+
+    try {
+        const response = await fetch(`${apiUrl}/Group/${currentGroupId}/delete`, {
+            method: "DELETE",
+            headers: getHeaders()
+        });
+
+        if (response.ok) {
+            closeGroupSettingsModal();
+            filterTasks('all');
+            loadGroups();
+        } else {
+            const err = await response.text();
+            alert(`Hata: ${err}`);
+        }
+    } catch (e) { console.error(e); }
+}
+
+async function toggleGroupAdmin(userId) {
+    try {
+        const res = await fetch(`${apiUrl}/Group/${currentGroupId}/toggle-admin/${userId}`, { method: "PUT", headers: getHeaders() });
+        if (res.ok) {
+            openGroupSettings();
+        } else {
+            const err = await res.text();
+            alert(`Hata: ${err}`);
+        }
+    } catch (e) { console.error(e); }
+}
+
+async function kickGroupMember(userId, userName) {
+    if (!confirm(`@${userName} adlı kullanıcıyı gruptan çıkarmak istediğinize emin misiniz?`)) return;
+    try {
+        const res = await fetch(`${apiUrl}/Group/${currentGroupId}/remove-member/${userId}`, { method: "POST", headers: getHeaders() });
+        if (res.ok) {
+            openGroupSettings();
+        } else {
+            const err = await res.text();
+            alert(`Hata: ${err}`);
+        }
+    } catch (e) { console.error(e); }
 }

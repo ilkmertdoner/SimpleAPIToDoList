@@ -7,19 +7,20 @@ namespace TaskManagerApi.Models
     {
         [Key]
         public int Id { get; set; }
-        public string? Title { get; set; }
+        public string Title { get; set; }
         public string? Description { get; set; }
-        public int Priority { get; set; } = 0;
-        public DateTime DateTime { get; set; } = DateTime.Now;
-
-        [JsonPropertyName("dueDate")]
+        public int Priority { get; set; }
         public DateTime? DueDate { get; set; }
+        public DateTime DateTime { get; set; }
         public bool IsCompleted { get; set; }
-        public bool isFavorite { get; set; } = false;
-        public bool isDeleted { get; set; } = false;
+        public bool isFavorite { get; set; }
+        public bool isDeleted { get; set; }
         public string? TokenId { get; set; }
         public string? GoogleCalendarEventId { get; set; }
         public string? MicrosoftCalendarEventId { get; set; }
+
+        public int? GroupId { get; set; }
+        public Group? Group { get; set; }
 
         [JsonIgnore]
         public ICollection<TaskAssign>? Assign { get; set; }

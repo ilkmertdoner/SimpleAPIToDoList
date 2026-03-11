@@ -38,10 +38,7 @@ namespace TaskManagerApi.Controllers
                 return BadRequest("Bu kullanıcı adı zaten kullanılıyor.");
 
             var oldTokens = _dbContext.EmailTokens.Where(t => t.Email == request.Email);
-            if (oldTokens.Any())
-            {
-                _dbContext.EmailTokens.RemoveRange(oldTokens);
-            }
+            if (oldTokens.Any()) { _dbContext.EmailTokens.RemoveRange(oldTokens); }
 
             var user = new User
             {
@@ -118,11 +115,11 @@ namespace TaskManagerApi.Controllers
             if (tokenRecord.ExpirationDate < DateTime.Now)
                 return BadRequest("Doğrulama kodunun süresi dolmuş.");
 
-            var user = new User 
-            { 
-                Username = tokenRecord.Username, 
-                Email = tokenRecord.Email, 
-                Password = tokenRecord.Password 
+            var user = new User
+            {
+                Username = tokenRecord.Username,
+                Email = tokenRecord.Email,
+                Password = tokenRecord.Password
             };
 
             _dbContext.Users.Add(user);
@@ -139,10 +136,10 @@ namespace TaskManagerApi.Controllers
             if (user == null || !BCrypt.Net.BCrypt.Verify(request.Password, user.Password))
                 return BadRequest("Geçersiz kullanıcı adı veya şifre.");
 
-            var checkVerifications = _dbContext.EmailTokens.Where(x=>x.ExpirationDate < DateTime.Now 
+            var checkVerifications = _dbContext.EmailTokens.Where(x => x.ExpirationDate < DateTime.Now
                 && x.Username == request.Username).ToList();
 
-            if(checkVerifications.Any()) _dbContext.EmailTokens.RemoveRange(checkVerifications);
+            if (checkVerifications.Any()) _dbContext.EmailTokens.RemoveRange(checkVerifications);
 
             await _dbContext.SaveChangesAsync();
 
@@ -155,8 +152,11 @@ namespace TaskManagerApi.Controllers
         {
             try
             {
-                var settings = new GoogleJsonWebSignature.ValidationSettings { Audience = new[]
-                { "787940789409-k70mn4qf4fatqgsjnlr3h7fn8dj7bklt.apps.googleusercontent.com" } };
+                var settings = new GoogleJsonWebSignature.ValidationSettings
+                {
+                    Audience = new[]
+                { "787940789409-k70mn4qf4fatqgsjnlr3h7fn8dj7bklt.apps.googleusercontent.com" }
+                };
 
                 var payload = await GoogleJsonWebSignature.ValidateAsync(request.Token, settings);
                 var user = await _dbContext.Users.FirstOrDefaultAsync(u => u.Email == payload.Email);

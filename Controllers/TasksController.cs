@@ -1,14 +1,11 @@
-﻿using System.Security.Claims;
-using System.Text;
-using Google.Apis.Calendar.v3;
-using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Http;
+﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.IdentityModel.Tokens;
 using TaskManagerApi.Data;
 using TaskManagerApi.Models;
 using TaskManagerApi.Service;
+using TaskManagerApi.Dto;
+using Mapster;
 
 namespace TaskManagerApi.Controllers
 {
@@ -32,21 +29,34 @@ namespace TaskManagerApi.Controllers
         private string GetUserIdFromHeader()
         {
             var UserIdClaim = User.Claims.FirstOrDefault(c => c.Type == "UserId")?.Value;
-
             if (!string.IsNullOrEmpty(UserIdClaim)) return UserIdClaim;
-
             return "unknown";
         }
 
         [HttpGet]
         public async Task<IActionResult> GetTasks([FromQuery] string search = "", [FromQuery] string status = "all",
-            [FromQuery] int? priority = null)
+            [FromQuery] int? priority = null, [FromQuery] int? groupId = null)
         {
             var currentUserIdStr = GetUserIdFromHeader();
             int currentUserId = int.Parse(currentUserIdStr);
 
-            var query = _dbContext.TaskItems.Where(t => (t.TokenId == currentUserIdStr ||
-                t.Assign.Any(x => x.UserId == currentUserId)) && t.isDeleted == false).AsQueryable();
+            var query = _dbContext.TaskItems.Where(t => t.isDeleted == false).AsQueryable();
+
+            if (groupId.HasValue)
+            {
+                var isMember = await _dbContext.GroupMembers
+                    .AnyAsync(gm => gm.GroupId == groupId.Value && gm.UserId == currentUserId);
+
+                if (!isMember)
+                    return StatusCode(StatusCodes.Status403Forbidden, "Bu grubun görevlerini görme yetkiniz yok.");
+
+                query = query.Where(t => t.GroupId == groupId.Value);
+            }
+            else
+            {
+                query = query.Where(t => t.GroupId == null && (t.TokenId == currentUserIdStr ||
+                    t.Assign.Any(x => x.UserId == currentUserId)));
+            }
 
             if (!string.IsNullOrEmpty(search))
                 query = query.Where(t => t.Title.Contains(search) || t.Description.Contains(search));
@@ -56,28 +66,7 @@ namespace TaskManagerApi.Controllers
 
             if (priority.HasValue) query = query.Where(t => t.Priority == priority.Value);
 
-            var tasks = await query.Select(t => new
-            {
-                Id = t.Id,
-                Title = t.Title,
-                Description = t.Description,
-                Priority = t.Priority,
-                DueDate = t.DueDate,
-                IsCompleted = t.IsCompleted,
-                IsFavorite = t.isFavorite,
-                IsDeleted = t.isDeleted,
-                TokenId = t.TokenId,
-                GoogleCalendarEventId = t.GoogleCalendarEventId,
-                MicrosoftCalendarEventId = t.MicrosoftCalendarEventId,
-                Assign = t.Assign.Select(a => new
-                {
-                    UserId = a.UserId,
-                    User = new
-                    {
-                        Username = a.User.Username
-                    }
-                }).ToList()
-            }).ToListAsync();
+            var tasks = await query.ProjectToType<TaskDto>().ToListAsync();
 
             return Ok(tasks);
         }
@@ -86,8 +75,14 @@ namespace TaskManagerApi.Controllers
         public async Task<IActionResult> GetFavorite()
         {
             var currentUserId = GetUserIdFromHeader();
-            var favoriteTasks = await _dbContext.TaskItems.Where(t => t.TokenId == currentUserId && t.isFavorite
-                && t.isDeleted == false).ToListAsync();
+            int userId = int.Parse(currentUserId);
+
+            var query = _dbContext.TaskItems
+                .Where(t => t.isFavorite && t.isDeleted == false &&
+                    (t.TokenId == currentUserId ||
+                     (t.GroupId != null && t.Group.Members.Any(gm => gm.UserId == userId))));
+
+            var favoriteTasks = await query.ProjectToType<TaskDto>().ToListAsync();
 
             return Ok(favoriteTasks);
         }
@@ -98,12 +93,18 @@ namespace TaskManagerApi.Controllers
             var userId = GetUserIdFromHeader();
             int currentUserId = int.Parse(userId);
 
-            var task = await _dbContext.TaskItems
-                .Include(t => t.Assign)
-                .FirstOrDefaultAsync(t => t.Id == id && (t.TokenId == userId 
-                || t.Assign.Any(a => a.UserId == currentUserId)));
+            var task = await _dbContext.TaskItems.FindAsync(id);
+            if (task == null) return NotFound("Görev bulunamadı.");
 
-            if (task == null) return BadRequest();
+            bool isPersonalOwner = task.GroupId == null && task.TokenId == userId;
+            bool isAssigned = task.GroupId == null && await _dbContext.TaskAssign.AnyAsync
+                (a => a.TaskId == id && a.UserId == currentUserId);
+
+            bool isGroupMember = task.GroupId != null && await _dbContext.GroupMembers.AnyAsync
+                (gm => gm.GroupId == task.GroupId && gm.UserId == currentUserId);
+
+            if (!isPersonalOwner && !isAssigned && !isGroupMember)
+                return StatusCode(StatusCodes.Status403Forbidden, "Yetkiniz yok.");
 
             task.isFavorite = !task.isFavorite;
             await _dbContext.SaveChangesAsync();
@@ -114,15 +115,20 @@ namespace TaskManagerApi.Controllers
         [HttpPut("bin/{id}")]
         public async Task<IActionResult> ChangeDeletedTaskStatus(int id)
         {
-            var userId = GetUserIdFromHeader();
-            int currentUserId = int.Parse(userId);
+            var userIdString = GetUserIdFromHeader();
+            int currentUserId = int.Parse(userIdString);
 
-            var task = await _dbContext.TaskItems
-                .Include(t => t.Assign)
-                .FirstOrDefaultAsync(t => t.Id == id && (t.TokenId == userId 
-                || t.Assign.Any(a => a.UserId == currentUserId)));
+            var task = await _dbContext.TaskItems.FindAsync(id);
+            if (task == null) return NotFound("Görev bulunamadı.");
 
-            if (task == null) return BadRequest();
+            bool isPersonalOwner = task.GroupId == null && task.TokenId == userIdString;
+            bool isTaskCreator = task.TokenId == userIdString;
+            bool isGroupAdmin = task.GroupId != null && await _dbContext.GroupMembers.AnyAsync
+                (gm => gm.GroupId == task.GroupId && gm.UserId == currentUserId && gm.isAdmin);
+
+            if (!isPersonalOwner && !isTaskCreator && !isGroupAdmin)
+                return StatusCode(StatusCodes.Status403Forbidden, 
+                    "Sadece görevi oluşturan kişi veya grup yöneticisi çöpe atabilir.");
 
             task.isDeleted = !task.isDeleted;
             await _dbContext.SaveChangesAsync();
@@ -138,54 +144,72 @@ namespace TaskManagerApi.Controllers
         public async Task<IActionResult> GetDeletedTasks()
         {
             var currentUserId = GetUserIdFromHeader();
-            var deletedTasks = await _dbContext.TaskItems.Where(t => t.TokenId == currentUserId && t.isDeleted)
-                .ToListAsync();
+            int userId = int.Parse(currentUserId);
+
+            var query = _dbContext.TaskItems
+                .Where(t => t.isDeleted &&
+                    (t.TokenId == currentUserId ||
+                     (t.GroupId != null && t.Group.Members.Any(gm => gm.UserId == userId))));
+
+            var deletedTasks = await query.ProjectToType<TaskDto>().ToListAsync();
 
             return Ok(deletedTasks);
         }
 
         [HttpPost]
-        public async Task<IActionResult> CreateTask([FromBody] TaskItem task)
+        public async Task<IActionResult> CreateTask([FromBody] TaskRequestDto dto)
         {
-            if (task == null) return BadRequest();
+            var userIdStr = GetUserIdFromHeader();
+            var currentUserId = int.Parse(userIdStr);
 
-            task.TokenId = GetUserIdFromHeader();
-            var user = await _dbContext.Users.FindAsync(int.Parse(task.TokenId));
+            if (dto.GroupId.HasValue)
+            {
+                var isMember = await _dbContext.GroupMembers
+                    .AnyAsync(gm => gm.GroupId == dto.GroupId.Value && gm.UserId == currentUserId);
 
-            if (task.DateTime == default) task.DateTime = DateTime.UtcNow;
+                if (!isMember)
+                    return StatusCode(StatusCodes.Status403Forbidden, "Bu gruba görev ekleme yetkiniz yok.");
+            }
+
+            var user = await _dbContext.Users.FindAsync(currentUserId);
+
+            var newTask = new TaskItem
+            {
+                Title = dto.Title,
+                Description = dto.Description,
+                Priority = dto.Priority,
+                DueDate = dto.DueDate,
+                IsCompleted = dto.IsCompleted,
+                isFavorite = dto.isFavorite,
+                GroupId = dto.GroupId,
+                TokenId = userIdStr,
+                DateTime = DateTime.UtcNow,
+                isDeleted = false
+            };
 
             try
             {
-                if (task.DueDate.HasValue && user != null && !string.IsNullOrEmpty(user.Email))
+                if (newTask.DueDate.HasValue && user != null && !string.IsNullOrEmpty(user.Email))
                 {
                     if (user.Email.EndsWith("@gmail.com", StringComparison.OrdinalIgnoreCase))
                     {
-                        try
-                        {
-                            string eventId = await _calendarService.AddTaskToUserCalendarAsync(user.Email,
-                                task.Title, task.Description ?? "", task.DueDate.Value);
-
-                            task.GoogleCalendarEventId = eventId;
-                        }
+                        try { newTask.GoogleCalendarEventId = await _calendarService.AddTaskToUserCalendarAsync
+                                (user.Email, newTask.Title, newTask.Description ?? "", newTask.DueDate.Value); 
+                        } 
                         catch { }
                     }
-                    else if (user.Email.EndsWith("@hotmail.com", StringComparison.OrdinalIgnoreCase)
+                    else if (user.Email.EndsWith("@hotmail.com", StringComparison.OrdinalIgnoreCase) 
                         || user.Email.EndsWith("@outlook.com", StringComparison.OrdinalIgnoreCase))
                     {
-                        try
-                        {
-                            string eventId = await _microsoftCalendarService.AddTaskToUserCalendarAsync
-                                (user.Email, task.Title, task.Description ?? "", task.DueDate.Value);
-
-                            task.MicrosoftCalendarEventId = eventId;
-                        }
-                        catch { }
+                        try { newTask.MicrosoftCalendarEventId = await _microsoftCalendarService
+                                .AddTaskToUserCalendarAsync(user.Email, newTask.Title, newTask.Description ?? "", 
+                                newTask.DueDate.Value); } catch { }
                     }
                 }
 
-                await _dbContext.TaskItems.AddAsync(task);
+                _dbContext.TaskItems.Add(newTask);
                 await _dbContext.SaveChangesAsync();
-                return CreatedAtAction(nameof(GetTasks), new { id = task.Id }, task);
+                return Ok(newTask);
             }
             catch (Exception ex)
             {
@@ -194,24 +218,31 @@ namespace TaskManagerApi.Controllers
         }
 
         [HttpPut("{id}")]
-        public async Task<IActionResult> UpdateTask(int id, [FromBody] TaskItem updatedTask)
+        public async Task<IActionResult> UpdateTask(int id, [FromBody] TaskRequestDto dto)
         {
             var userIdString = GetUserIdFromHeader();
             int currentUserId = int.Parse(userIdString);
 
-            var existingTask = await _dbContext.TaskItems
-                .Include(t => t.Assign)
-                .FirstOrDefaultAsync(t => t.Id == id && (t.TokenId == userIdString 
-                || t.Assign.Any(a => a.UserId == currentUserId)));
+            var existingTask = await _dbContext.TaskItems.FindAsync(id);
+            if (existingTask == null) return NotFound("Görev bulunamadı.");
 
-            if (existingTask == null) return NotFound();
+            bool isPersonalOwner = existingTask.GroupId == null && existingTask.TokenId == userIdString;
+            bool isAssigned = existingTask.GroupId == null 
+                && await _dbContext.TaskAssign.AnyAsync(a => a.TaskId == id && a.UserId == currentUserId);
 
-            existingTask.Title = updatedTask.Title;
-            existingTask.Description = updatedTask.Description;
-            existingTask.IsCompleted = updatedTask.IsCompleted;
-            existingTask.isFavorite = updatedTask.isFavorite;
-            existingTask.Priority = updatedTask.Priority;
-            existingTask.DueDate = updatedTask.DueDate;
+            bool isGroupMember = existingTask.GroupId != null 
+                && await _dbContext.GroupMembers.AnyAsync(gm => gm.GroupId == existingTask.GroupId 
+                && gm.UserId == currentUserId);
+
+            if (!isPersonalOwner && !isAssigned && !isGroupMember)
+                return StatusCode(StatusCodes.Status403Forbidden, "Bu görevi düzenleme yetkiniz yok.");
+
+            existingTask.Title = dto.Title;
+            existingTask.Description = dto.Description;
+            existingTask.IsCompleted = dto.IsCompleted;
+            existingTask.isFavorite = dto.isFavorite;
+            existingTask.Priority = dto.Priority;
+            existingTask.DueDate = dto.DueDate;
 
             var creatorUser = await _dbContext.Users.FindAsync(int.Parse(existingTask.TokenId));
 
@@ -223,35 +254,24 @@ namespace TaskManagerApi.Controllers
                     {
                         if (existingTask.DueDate.HasValue)
                         {
-                            try
-                            {
-                                await _calendarService.UpdateTaskInUserCalendarAsync(creatorUser.Email,
-                                    existingTask.GoogleCalendarEventId, existingTask.Title,
-                                    existingTask.Description ?? "", existingTask.DueDate.Value);
-                            }
+                            try { await _calendarService.UpdateTaskInUserCalendarAsync
+                                    (creatorUser.Email, existingTask.GoogleCalendarEventId, existingTask.Title, 
+                                    existingTask.Description ?? "", existingTask.DueDate.Value); } 
                             catch { }
                         }
                         else
                         {
-                            try
-                            {
-                                await _calendarService.DeleteTaskFromUserCalendarAsync(creatorUser.Email,
-                                    existingTask.GoogleCalendarEventId);
-                            }
+                            try { await _calendarService.DeleteTaskFromUserCalendarAsync
+                                    (creatorUser.Email, existingTask.GoogleCalendarEventId); } 
                             catch { }
-
                             existingTask.GoogleCalendarEventId = null;
                         }
                     }
                     else if (existingTask.DueDate.HasValue)
                     {
-                        try
-                        {
-                            string eventId = await _calendarService.AddTaskToUserCalendarAsync(creatorUser.Email,
-                                existingTask.Title, existingTask.Description ?? "", existingTask.DueDate.Value);
-
-                            existingTask.GoogleCalendarEventId = eventId;
-                        }
+                        try { existingTask.GoogleCalendarEventId = await _calendarService.AddTaskToUserCalendarAsync
+                                (creatorUser.Email, existingTask.Title, existingTask.Description ?? "", 
+                                existingTask.DueDate.Value); } 
                         catch { }
                     }
                 }
@@ -262,37 +282,27 @@ namespace TaskManagerApi.Controllers
                     {
                         if (existingTask.DueDate.HasValue)
                         {
-                            try
-                            {
-                                await _microsoftCalendarService.UpdateTaskInUserCalendarAsync(creatorUser.Email,
-                                    existingTask.MicrosoftCalendarEventId, existingTask.Title,
-                                    existingTask.Description ?? "", existingTask.DueDate.Value);
-                            }
+                            try { await _microsoftCalendarService.UpdateTaskInUserCalendarAsync
+                                    (creatorUser.Email, existingTask.MicrosoftCalendarEventId, 
+                                    existingTask.Title, existingTask.Description ?? "", 
+                                    existingTask.DueDate.Value); } 
                             catch { }
                         }
                         else
                         {
-                            try
-                            {
-                                await _microsoftCalendarService.DeleteTaskFromUserCalendarAsync(creatorUser.Email,
-                                    existingTask.MicrosoftCalendarEventId);
-                            }
-                            catch { }
+                            try { await _microsoftCalendarService.DeleteTaskFromUserCalendarAsync
+                                    (creatorUser.Email, existingTask.MicrosoftCalendarEventId); 
+                            } catch { }
 
                             existingTask.MicrosoftCalendarEventId = null;
                         }
                     }
                     else if (existingTask.DueDate.HasValue)
                     {
-                        try
-                        {
-                            string eventId = await _microsoftCalendarService.AddTaskToUserCalendarAsync(
-                                creatorUser.Email,existingTask.Title, existingTask.Description ?? "", 
-                                existingTask.DueDate.Value);
-
-                            existingTask.MicrosoftCalendarEventId = eventId;
-                        }
-                        catch { }
+                        try { existingTask.MicrosoftCalendarEventId = 
+                                await _microsoftCalendarService.AddTaskToUserCalendarAsync
+                                (creatorUser.Email, existingTask.Title, existingTask.Description ?? "", 
+                                existingTask.DueDate.Value); } catch { }
                     }
                 }
             }
@@ -305,42 +315,43 @@ namespace TaskManagerApi.Controllers
         public async Task<IActionResult> DeleteTask(int id)
         {
             var userIdString = GetUserIdFromHeader();
+            int currentUserId = int.Parse(userIdString);
 
-            var task = await _dbContext.TaskItems.FirstOrDefaultAsync(t => t.Id == id && t.TokenId == userIdString);
+            var task = await _dbContext.TaskItems.FindAsync(id);
+            if (task == null) return NotFound("Görev bulunamadı.");
 
-            if (task == null)
-                return StatusCode(StatusCodes.Status403Forbidden, "Sadece görevi oluşturan kişi kalıcı olarak silebilir.");
+            bool isPersonalOwner = task.GroupId == null && task.TokenId == userIdString;
+            bool isTaskCreator = task.TokenId == userIdString;
+            bool isGroupAdmin = task.GroupId != null && await _dbContext.GroupMembers
+                .AnyAsync(gm => gm.GroupId == task.GroupId && gm.UserId == currentUserId && gm.isAdmin);
 
-            var user = await _dbContext.Users.FindAsync(int.Parse(userIdString));
+            if (!isPersonalOwner && !isTaskCreator && !isGroupAdmin)
+                return StatusCode(StatusCodes.Status403Forbidden, "Sadece görevi oluşturan kişi veya grup yöneticisi silebilir.");
+
+            var user = await _dbContext.Users.FindAsync(int.Parse(task.TokenId));
 
             if (user != null && !string.IsNullOrEmpty(user.Email))
             {
                 if (user.Email.EndsWith("@gmail.com", StringComparison.OrdinalIgnoreCase) 
                     && !string.IsNullOrEmpty(task.GoogleCalendarEventId))
                 {
-                    try
-                    {
-                        await _calendarService.DeleteTaskFromUserCalendarAsync(user.Email, task.GoogleCalendarEventId);
-                    }
-                    catch { }
+                    try { await _calendarService.DeleteTaskFromUserCalendarAsync(user.Email, task.GoogleCalendarEventId); } catch { }
                 }
                 else if ((user.Email.EndsWith("@hotmail.com", StringComparison.OrdinalIgnoreCase) 
                     || user.Email.EndsWith("@outlook.com", StringComparison.OrdinalIgnoreCase)) 
                     && !string.IsNullOrEmpty(task.MicrosoftCalendarEventId))
                 {
-                    try
-                    {
-                        await _microsoftCalendarService.DeleteTaskFromUserCalendarAsync(user.Email, 
-                            task.MicrosoftCalendarEventId);
-                    }
-                    catch { }
+                    try { await _microsoftCalendarService.DeleteTaskFromUserCalendarAsync(user.Email, task.MicrosoftCalendarEventId); } catch { }
                 }
             }
+
+            var assigns = _dbContext.TaskAssign.Where(a => a.TaskId == id);
+            _dbContext.TaskAssign.RemoveRange(assigns);
 
             _dbContext.TaskItems.Remove(task);
             await _dbContext.SaveChangesAsync();
 
-            return Ok();
+            return Ok(new { message = "Görev başarıyla silindi." });
         }
 
         [HttpPost("{taskId}/assign/{userId}")]
@@ -352,8 +363,13 @@ namespace TaskManagerApi.Controllers
             var task = await _dbContext.TaskItems.FindAsync(taskId);
             if (task == null) return NotFound("Görev bulunamadı.");
 
-            if (task.TokenId != currentUserIdStr) return StatusCode(StatusCodes.Status403Forbidden, 
-                "Sadece kendi görevlerinize kişi atayabilirsiniz.");
+            if (task.GroupId != null)
+                return BadRequest("Grup görevlerine ekstra kişi ataması yapılamaz.");
+
+            bool isPersonalTaskOwner = task.GroupId == null && task.TokenId == currentUserIdStr;
+
+            if (!isPersonalTaskOwner)
+                return StatusCode(StatusCodes.Status403Forbidden, "Bu işlem için yetkiniz yok.");
 
             var targetUser = await _dbContext.Users.FindAsync(userId);
             if (targetUser == null) return NotFound("Kullanıcı bulunamadı.");
@@ -399,7 +415,13 @@ namespace TaskManagerApi.Controllers
             var task = await _dbContext.TaskItems.FindAsync(taskId);
             if (task == null) return NotFound("Görev bulunamadı.");
 
-            if (task.TokenId != currentUserIdStr && currentUserId != userId)
+            if (task.GroupId != null)
+                return BadRequest("Grup görevlerinde atama işlemi yapılamaz.");
+
+            bool isTaskCreator = task.TokenId == currentUserIdStr;
+            bool isSelfRemoving = currentUserId == userId;
+
+            if (!isTaskCreator && !isSelfRemoving)
                 return StatusCode(StatusCodes.Status403Forbidden, "Bu işlem için yetkiniz yok.");
 
             var assign = await _dbContext.TaskAssign.FirstOrDefaultAsync(a => a.TaskId == taskId && a.UserId == userId);

@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Yapılacaklar Listesi</title>
+    <title>Task Manager</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = { darkMode: 'class' }
@@ -39,6 +39,11 @@
         .dark .glass-effect {
             background: rgba(30, 30, 30, 0.8);
         }
+
+        .group-active {
+            border-left: 4px solid #3b82f6;
+            background-color: rgba(59, 130, 246, 0.1);
+        }
     </style>
 </head>
 
@@ -57,7 +62,7 @@
             </button>
             <div
                 class="brand text-xl font-bold bg-gradient-to-r from-blue-600 to-indigo-500 bg-clip-text text-transparent hidden sm:block">
-                Yapılacaklar Listesi
+                TaskManager
             </div>
         </div>
 
@@ -88,9 +93,9 @@
         <aside id="sidebar"
             class="theme-transition w-72 bg-white dark:bg-[#1e1e1e] border-r border-slate-200 dark:border-slate-800 flex flex-col absolute md:relative z-30 h-full transition-all duration-300 transform md:transform-none -translate-x-full md:translate-x-0 flex-shrink-0 shadow-2xl md:shadow-none">
 
-            <div class="p-4 space-y-6 flex-grow overflow-y-auto">
+            <div class="p-4 flex-grow overflow-y-auto overflow-x-hidden">
                 <div
-                    class="flex items-center gap-3 p-3 rounded-xl bg-slate-50 dark:bg-[#252525] border border-slate-100 dark:border-slate-700 overflow-hidden">
+                    class="flex items-center gap-3 p-3 mb-6 rounded-xl bg-slate-50 dark:bg-[#252525] border border-slate-100 dark:border-slate-700 overflow-hidden">
                     <div
                         class="w-10 h-10 rounded-full bg-blue-500 flex items-center justify-center text-white font-bold text-lg shadow-md shrink-0">
                         👤
@@ -101,32 +106,49 @@
                     </div>
                     <button onclick="deleteAccount()" title="Hesabımı Sil"
                         class="shrink-0 p-2 text-red-500 hover:text-red-600 hover:bg-red-100 dark:hover:bg-red-900/30 rounded-lg transition-colors">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"
-                            stroke-width="2">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24"
+                            stroke="currentColor" stroke-width="2">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M9 14a6 6 0 00-6 6v1h12v-1a6 6 0 00-6-6z" />
+                            <path stroke-linecap="round" stroke-linejoin="round"
+                                d="M9 14a6 6 0 00-6 6v1h12v-1a6 6 0 00-6-6z" />
                             <path stroke-linecap="round" stroke-linejoin="round" d="M17 8l4 4m0-4l-4 4" />
                         </svg>
                     </button>
                 </div>
 
-                <div class="space-y-1">
-                    <button onclick="filterTasks('all')"
-                        class="w-full flex items-center gap-3 px-4 py-2.5 text-left rounded-xl bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 font-medium hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors">
-                        <span>📋</span> Tüm Görevler
+                <div class="space-y-1 mb-6">
+                    <button onclick="filterTasks('all', null)" id="nav-personal"
+                        class="w-full flex items-center gap-3 px-4 py-2.5 text-left rounded-xl bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 font-medium hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors group-active">
+                        <span>👤</span> Kişisel Görevlerim
                     </button>
-                    <button onclick="filterTasks('favorites')"
+                    <button onclick="filterTasks('favorites', null)"
                         class="w-full flex items-center gap-3 px-4 py-2.5 text-left rounded-xl text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#2c2c2c] transition-colors">
                         <span>⭐</span> Favoriler
                     </button>
-                    <button onclick="filterTasks('deleted')"
+                    <button onclick="filterTasks('deleted', null)"
                         class="w-full flex items-center gap-3 px-4 py-2.5 text-left rounded-xl text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#2c2c2c] transition-colors">
                         <span>🗑️</span> Çöp Kutusu
                     </button>
                 </div>
 
+                <div class="mb-6">
+                    <div class="flex items-center justify-between px-2 mb-2">
+                        <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Çalışma
+                            Alanları</span>
+                        <button onclick="openCreateGroupModal()"
+                            class="text-blue-500 hover:text-blue-600 transition-colors" title="Yeni Grup Oluştur">
+                            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M12 4v16m8-8H4"></path>
+                            </svg>
+                        </button>
+                    </div>
+                    <div id="groupListSidebar" class="space-y-1">
+                    </div>
+                </div>
+
                 <div id="miniCalendar"
-                    class="bg-slate-50 dark:bg-[#252525] rounded-xl border border-slate-100 dark:border-slate-700 p-3 shadow-sm mt-8">
+                    class="bg-slate-50 dark:bg-[#252525] rounded-xl border border-slate-100 dark:border-slate-700 p-3 shadow-sm">
                 </div>
             </div>
 
@@ -147,12 +169,22 @@
 
         <main class="flex-1 p-4 md:p-8 overflow-y-auto overflow-x-hidden bg-slate-50 dark:bg-[#121212]">
             <div class="max-w-4xl mx-auto">
+
                 <div
                     class="bg-white dark:bg-[#1e1e1e] border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm p-6 mb-8 transition-all">
-                    <h3 class="text-lg font-bold mb-4 flex items-center gap-2">
-                        <span class="w-1 h-6 bg-blue-500 rounded-full"></span>
-                        <span id="formTitle">Yeni Görev</span>
-                    </h3>
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-lg font-bold flex items-center gap-2">
+                            <span class="w-1 h-6 bg-blue-500 rounded-full"></span>
+                            <span id="formTitle">Yeni Görev</span>
+                        </h3>
+                        <div class="w-1/3 min-w-[150px]">
+                            <select id="taskGroupSelect"
+                                class="w-full bg-slate-100 dark:bg-[#2c2c2c] border-none rounded-xl p-2 text-sm outline-none focus:ring-2 focus:ring-blue-500 dark:text-white transition-all cursor-pointer font-medium text-slate-700 dark:text-slate-300">
+                                <option value="">👤 Kişisel Görev</option>
+                            </select>
+                        </div>
+                    </div>
+
                     <div class="space-y-4">
                         <input type="text" id="taskTitle"
                             class="w-full bg-slate-50 dark:bg-[#2c2c2c] border border-slate-200 dark:border-slate-700 rounded-xl p-3 outline-none focus:ring-2 focus:ring-blue-500 dark:text-white transition-all placeholder:text-slate-400"
@@ -185,8 +217,21 @@
 
                 <div class="flex flex-col gap-4 mb-6">
                     <div class="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4">
-                        <h2 class="text-2xl font-bold dark:text-white flex items-center gap-2 whitespace-nowrap"
-                            id="pageTitle">Tüm Görevler</h2>
+                        <div class="flex items-center gap-3">
+                            <h2 class="text-2xl font-bold dark:text-white flex items-center gap-2 whitespace-nowrap"
+                                id="pageTitle">Kişisel Görevlerim</h2>
+                            <button id="groupSettingsBtn" onclick="openGroupSettings()"
+                                class="hidden text-slate-400 hover:text-blue-500 transition-colors"
+                                title="Grup Ayarları">
+                                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z">
+                                    </path>
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                                </svg>
+                            </button>
+                        </div>
                         <div class="flex flex-wrap gap-2 w-full xl:w-auto items-center">
                             <div class="relative flex-grow xl:flex-grow-0 min-w-[200px]">
                                 <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">🔍</span>
@@ -221,9 +266,9 @@
 
         <div id="sidebarOverlay" onclick="toggleSidebar()"
             class="fixed inset-0 bg-black/50 z-0 hidden md:hidden backdrop-blur-sm transition-opacity"></div>
-
         <div id="rightPanelOverlay" onclick="closeRightPanel()"
             class="fixed inset-0 bg-black/50 z-40 hidden backdrop-blur-sm transition-opacity"></div>
+
         <aside id="rightPanel"
             class="theme-transition fixed inset-y-0 right-0 z-50 w-80 bg-white dark:bg-[#1e1e1e] shadow-2xl transform transition-transform duration-300 translate-x-full border-l border-slate-200 dark:border-slate-800 flex flex-col">
             <div
@@ -260,6 +305,76 @@
 
     </div>
 
+    <div id="createGroupModal" class="fixed inset-0 z-50 flex items-center justify-center hidden p-4">
+        <div class="absolute inset-0 bg-black/60 backdrop-blur-sm" onclick="closeCreateGroupModal()"></div>
+        <div
+            class="relative w-full max-w-md bg-white dark:bg-[#1e1e1e] rounded-2xl shadow-2xl p-6 border border-slate-200 dark:border-slate-800">
+            <h3 class="text-xl font-bold mb-4 flex items-center gap-2">🏢 Yeni Grup Oluştur</h3>
+            <div class="space-y-4 mb-4">
+                <div>
+                    <label class="block text-sm font-bold text-slate-500 mb-1">Grup Adı</label>
+                    <input type="text" id="groupNameInput"
+                        class="w-full bg-slate-50 dark:bg-[#2c2c2c] border border-slate-200 dark:border-slate-700 rounded-xl p-3 outline-none focus:ring-2 focus:ring-blue-500 dark:text-white"
+                        placeholder="Örn: Bitirme Projesi">
+                </div>
+                <div>
+                    <label class="block text-sm font-bold text-slate-500 mb-1">Açıklama (Opsiyonel)</label>
+                    <textarea id="groupDescInput" rows="2"
+                        class="w-full bg-slate-50 dark:bg-[#2c2c2c] border border-slate-200 dark:border-slate-700 rounded-xl p-3 outline-none focus:ring-2 focus:ring-blue-500 dark:text-white resize-none"
+                        placeholder="Bu grubun amacı nedir?"></textarea>
+                </div>
+            </div>
+            <div class="flex justify-end gap-2">
+                <button onclick="closeCreateGroupModal()"
+                    class="px-4 py-2 bg-slate-200 dark:bg-slate-700 text-slate-800 dark:text-white font-bold rounded-xl hover:bg-slate-300 dark:hover:bg-slate-600 transition-all">İptal</button>
+                <button onclick="submitCreateGroup()"
+                    class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl transition-all shadow-md">Oluştur</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="groupSettingsModal" class="fixed inset-0 z-50 flex items-center justify-center hidden p-4">
+        <div class="absolute inset-0 bg-black/60 backdrop-blur-sm" onclick="closeGroupSettingsModal()"></div>
+        <div
+            class="relative w-full max-w-lg bg-white dark:bg-[#1e1e1e] rounded-2xl shadow-2xl p-6 border border-slate-200 dark:border-slate-800 flex flex-col max-h-[85vh]">
+            <div class="flex justify-between items-start mb-4">
+                <div>
+                    <h3 id="settingsGroupName" class="text-xl font-bold flex items-center gap-2">🏢 Grup Adı</h3>
+                    <p id="settingsGroupDesc" class="text-sm text-slate-500 mt-1">Açıklama</p>
+                </div>
+                <button onclick="closeGroupSettingsModal()"
+                    class="text-slate-500 hover:text-red-500 font-bold text-2xl leading-none">&times;</button>
+            </div>
+
+            <div class="mb-4">
+                <div class="flex gap-2">
+                    <select id="groupAddMemberSelect"
+                        class="flex-grow bg-slate-50 dark:bg-[#2c2c2c] border border-slate-200 dark:border-slate-700 rounded-xl p-3 outline-none focus:ring-2 focus:ring-blue-500 dark:text-white">
+                        <option value="">Gruba eklenecek arkadaşını seç...</option>
+                    </select>
+                    <button onclick="addMemberToGroup()" id="groupAddMemberBtn"
+                        class="bg-blue-600 hover:bg-blue-700 text-white font-bold px-4 rounded-xl transition-all shadow-md shrink-0">Ekle</button>
+                </div>
+            </div>
+
+            <div
+                class="flex-grow overflow-y-auto border border-slate-200 dark:border-slate-700 rounded-xl p-3 bg-slate-50 dark:bg-[#252525]">
+                <h4 class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3">Grup Üyeleri</h4>
+                <div id="groupMembersList" class="space-y-2">
+                </div>
+            </div>
+
+            <div class="mt-4 flex justify-between pt-4 border-t border-slate-200 dark:border-slate-800">
+                <button id="leaveGroupBtn" onclick="leaveGroup()"
+                    class="text-orange-500 hover:text-white hover:bg-orange-500 font-bold px-4 py-2 rounded-xl border border-orange-500 transition-all text-sm">Gruptan
+                    Ayrıl</button>
+                <button id="deleteGroupBtn" onclick="deleteGroup()"
+                    class="hidden text-red-500 hover:text-white hover:bg-red-500 font-bold px-4 py-2 rounded-xl border border-red-500 transition-all text-sm">Grubu
+                    Sil</button>
+            </div>
+        </div>
+    </div>
+
     <div id="friendModal" class="fixed inset-0 z-50 flex items-center justify-center hidden p-4">
         <div class="absolute inset-0 bg-black/60 backdrop-blur-sm" onclick="closeFriendModal()"></div>
         <div
@@ -284,11 +399,11 @@
         <div
             class="relative w-full max-w-md bg-white dark:bg-[#1e1e1e] rounded-2xl shadow-2xl p-6 border border-slate-200 dark:border-slate-800">
             <h3 class="text-xl font-bold mb-4 flex items-center gap-2">📌 Göreve Ortak Ekle</h3>
-            <p class="text-sm text-slate-500 mb-4">Bu göreve atamak istediğiniz arkadaşınızı seçin (Maks. 3 kişi).</p>
+            <p class="text-sm text-slate-500 mb-4">Bu göreve atamak istediğiniz kişiyi seçin (Maks. 3 kişi).</p>
             <input type="hidden" id="assignTaskId">
             <select id="assignFriendSelect"
                 class="w-full bg-slate-50 dark:bg-[#2c2c2c] border border-slate-200 dark:border-slate-700 rounded-xl p-3 outline-none focus:ring-2 focus:ring-blue-500 dark:text-white mb-4">
-                <option value="">Arkadaş seçin...</option>
+                <option value="">Seçiniz...</option>
             </select>
             <div class="flex justify-end gap-2">
                 <button onclick="closeAssignModal()"
