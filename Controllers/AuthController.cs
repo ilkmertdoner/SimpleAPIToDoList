@@ -285,37 +285,62 @@ namespace TaskManagerApi.Controllers
         [HttpDelete("delete")]
         public async Task<IActionResult> DeleteAccount()
         {
-            var userIdString = User.FindFirst("UserId")?.Value;
+            var userIdClaim = User.Claims.FirstOrDefault(c => c.Type == "UserId")?.Value;
+            if (string.IsNullOrEmpty(userIdClaim)) return Unauthorized("Kullanıcı kimliği bulunamadı.");
 
-            if (string.IsNullOrEmpty(userIdString) || !int.TryParse(userIdString, out int userId))
-            {
-                return Unauthorized();
-            }
 
+            int userId = int.Parse(userIdClaim);
             var user = await _dbContext.Users.FindAsync(userId);
 
-            if (user == null)
+            if (user == null) return NotFound("Kullanıcı bulunamadı.");
+
+            var logs = _dbContext.ActivityLogs.Where(l => l.TokenId == userIdClaim);
+            _dbContext.ActivityLogs.RemoveRange(logs);
+
+            var friendships = _dbContext.FriendSystem.Where(f => f.RequesterId == userId || f.ReceiverId == userId);
+            _dbContext.FriendSystem.RemoveRange(friendships);
+
+            var taskAssigns = _dbContext.TaskAssign.Where(ta => ta.UserId == userId);
+            _dbContext.TaskAssign.RemoveRange(taskAssigns);
+
+            var groupMemberships = _dbContext.GroupMembers.Where(gm => gm.UserId == userId);
+            _dbContext.GroupMembers.RemoveRange(groupMemberships);
+
+            var createdGroups = await _dbContext.Groups.Where(g => g.CreatorId == userId).ToListAsync();
+
+            foreach (var group in createdGroups)
             {
-                return NotFound("Sistem Hatası.");
+                var groupTasks = _dbContext.TaskItems.Where(t => t.GroupId == group.Id);
+
+                foreach (var task in groupTasks)
+                {
+                    var taskAssignments = _dbContext.TaskAssign.Where(ta => ta.TaskId == task.Id);
+                    _dbContext.TaskAssign.RemoveRange(taskAssignments);
+                }
+
+                _dbContext.TaskItems.RemoveRange(groupTasks);
+
+                var members = _dbContext.GroupMembers.Where(gm => gm.GroupId == group.Id);
+                _dbContext.GroupMembers.RemoveRange(members);
             }
+            
+            _dbContext.Groups.RemoveRange(createdGroups);
 
-            var taskAssigns = await _dbContext.TaskAssign.Where(a => a.UserId == userId).ToListAsync();
-
-            if (taskAssigns.Any()) _dbContext.TaskAssign.RemoveRange(taskAssigns);
-
-            var tasks = await _dbContext.TaskItems.Where(t => t.TokenId == userIdString).ToListAsync();
-
-            if (tasks.Any()) _dbContext.TaskItems.RemoveRange(tasks);
-
-            var friends = await _dbContext.FriendSystem.Where(f => f.ReceiverId == userId || f.RequesterId == userId)
+            var personalTasks = await _dbContext.TaskItems.Where(t => t.TokenId == userIdClaim && t.GroupId == null)
                 .ToListAsync();
 
-            if (friends.Any()) _dbContext.FriendSystem.RemoveRange(friends);
+            foreach (var task in personalTasks)
+            {
+                var taskAssignments = _dbContext.TaskAssign.Where(ta => ta.TaskId == task.Id);
+                _dbContext.TaskAssign.RemoveRange(taskAssignments);
+            }
+            
+            _dbContext.TaskItems.RemoveRange(personalTasks);
 
             _dbContext.Users.Remove(user);
             await _dbContext.SaveChangesAsync();
 
-            return Ok(new { message = "Hesap Başarıyla Silindi." });
+            return Ok("Hesap ve bağlı tüm veriler başarıyla silindi.");
         }
 
         private string GenerateJwtToken(User user)
