@@ -17,10 +17,7 @@ namespace TaskManagerApi.Controllers
     {
         private readonly AppDbContext _dbcontext;
 
-        public GroupController(AppDbContext dbcontext)
-        {
-            _dbcontext = dbcontext;
-        }
+        public GroupController(AppDbContext dbcontext) { _dbcontext = dbcontext; }
 
         private string GetUserIdFromHeader()
         {
@@ -61,7 +58,8 @@ namespace TaskManagerApi.Controllers
             {
                 TokenId = currentUserId.ToString(),
                 Action = "Grup Oluşturuldu",
-                Details = $"{newGroup.Name} adında yeni bir grup oluşturdunuz."
+                Details = $"{newGroup.Name} adında yeni bir grup oluşturdunuz.",
+                CreatedAt = DateTime.Now,
             });
 
             await _dbcontext.SaveChangesAsync();
@@ -157,7 +155,8 @@ namespace TaskManagerApi.Controllers
             {
                 TokenId = targetUser.Id.ToString(),
                 Action = "Gruba Eklendiniz",
-                Details = $"{currentUser.Username} adlı kişi sizi {group.Name} adlı gruba ekledi."
+                Details = $"{currentUser.Username} adlı kişi sizi {group.Name} adlı gruba ekledi.",
+                CreatedAt = DateTime.Now,
             });
 
             await _dbcontext.SaveChangesAsync();
@@ -179,8 +178,7 @@ namespace TaskManagerApi.Controllers
                 var otherAdmins = await _dbcontext.GroupMembers
                     .AnyAsync(gm => gm.GroupId == groupId && gm.UserId != currentUserId && gm.isAdmin);
 
-                if (!otherAdmins)
-                    return 
+                if (!otherAdmins) return 
                         BadRequest("Gruptaki tek yöneticisiniz. Ayrılmadan önce başkasını yönetici yapın veya grubu silin.");
             }
 
@@ -193,7 +191,8 @@ namespace TaskManagerApi.Controllers
             {
                 TokenId = currentUserId.ToString(),
                 Action = "Gruptan Ayrıldınız",
-                Details = $"'{group.Name}' grubundan başarıyla ayrıldınız."
+                Details = $"'{group.Name}' grubundan başarıyla ayrıldınız.",
+                CreatedAt = DateTime.Now,
             });
 
             await _dbcontext.SaveChangesAsync();
@@ -231,7 +230,8 @@ namespace TaskManagerApi.Controllers
             {
                 TokenId = targetUser.Id.ToString(),
                 Action = "Gruptan Çıkarıldınız",
-                Details = $"@{currentUser.Username} sizi '{group.Name}' grubundan çıkardı."
+                Details = $"@{currentUser.Username} sizi '{group.Name}' grubundan çıkardı.",
+                CreatedAt = DateTime.Now,
             });
 
             await _dbcontext.SaveChangesAsync();
@@ -306,7 +306,8 @@ namespace TaskManagerApi.Controllers
                 {
                     TokenId = targetUser.Id.ToString(),
                     Action = actionText,
-                    Details = detailsText
+                    Details = detailsText,
+                    CreatedAt = DateTime.Now,
                 });
             }
 

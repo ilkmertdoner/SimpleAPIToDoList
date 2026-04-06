@@ -72,7 +72,8 @@ namespace TaskManagerApi.Controllers
             {
                 TokenId = targetUserId.ToString(),
                 Action = "Arkadaşlık İsteği",
-                Details = $"{Current.Username} Adlı Kullanıcı, Size Arkadaşlık İsteği Gönderdi."
+                Details = $"{Current.Username} Adlı Kullanıcı, Size Arkadaşlık İsteği Gönderdi.",
+                CreatedAt = DateTime.Now,
             };
 
             _dbContext.ActivityLogs.Add(currentUserLog);
@@ -108,14 +109,16 @@ namespace TaskManagerApi.Controllers
             {
                 TokenId = currentUserId.ToString(),
                 Action = "Arkadaşlıktan Çıkarıldınız",
-                Details = $"{Current.Username} Adlı Kullanıcı, {Target.Username} Adlı Kullanıcıyı Arkadaşlıktan Çıkardı"
+                Details = $"{Current.Username} Adlı Kullanıcı, {Target.Username} Adlı Kullanıcıyı Arkadaşlıktan Çıkardı",
+                CreatedAt = DateTime.Now,
             };
 
             var targetUserLog = new ActivityLog
             {
                 TokenId = targetUserId.ToString(),
                 Action = "Arkadaşlıktan Çıkarıldınız",
-                Details = $"{Current.Username} Adlı Kullanıcı, Sizi Arkadaşlıktan Çıkardı."
+                Details = $"{Current.Username} Adlı Kullanıcı, Sizi Arkadaşlıktan Çıkardı.",
+                CreatedAt = DateTime.Now,
             };
 
             _dbContext.ActivityLogs.Add(currentUserLog);
@@ -150,7 +153,8 @@ namespace TaskManagerApi.Controllers
             {
                 TokenId = currentUserId.ToString(),
                 Action = "Arkadaş Oldunuz!",
-                Details = $"Tebrikler! Artık {Target.Username} ile {Current.Username} arkadaş."
+                Details = $"Tebrikler! Artık {Target.Username} ile {Current.Username} arkadaş.",
+                CreatedAt = DateTime.Now,
             };
 
             _dbContext.ActivityLogs.Add(log);

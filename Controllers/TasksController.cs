@@ -418,14 +418,16 @@ namespace TaskManagerApi.Controllers
             {
                 TokenId = currentUserIdStr,
                 Action = "Göreve Ortak Eklendi",
-                Details = $"'{task.Title}' adlı göreve @{targetUser.Username} kişisini atadınız."
+                Details = $"'{task.Title}' adlı göreve @{targetUser.Username} kişisini atadınız.",
+                CreatedAt = DateTime.Now,
             };
 
             var targetUserLog = new ActivityLog
             {
                 TokenId = targetUser.Id.ToString(),
                 Action = "Yeni Görev Ataması",
-                Details = $"@{currentUser.Username} sizi '{task.Title}' adlı göreve atadı."
+                Details = $"@{currentUser.Username} sizi '{task.Title}' adlı göreve atadı.",
+                CreatedAt = DateTime.Now,
             };
 
             _dbContext.ActivityLogs.Add(currentUserLog);
@@ -473,7 +475,8 @@ namespace TaskManagerApi.Controllers
                 {
                     TokenId = task.TokenId,
                     Action = "Görevden Ayrılma",
-                    Details = $"@{currentUser.Username}, '{task.Title}' görevinden ayrıldı."
+                    Details = $"@{currentUser.Username}, '{task.Title}' görevinden ayrıldı.",
+                    CreatedAt = DateTime.Now,
                 };
 
                 _dbContext.ActivityLogs.Add(leaveTask);
@@ -486,7 +489,8 @@ namespace TaskManagerApi.Controllers
                 {
                     TokenId = targetUser.Id.ToString(),
                     Action = "Görevden Çıkarılma",
-                    Details = $"@{currentUser.Username}, sizi '{task.Title}' görevinden çıkardı."
+                    Details = $"@{currentUser.Username}, sizi '{task.Title}' görevinden çıkardı.",
+                    CreatedAt = DateTime.Now,
                 };
 
                 _dbContext.ActivityLogs.Add(kickFromTask);

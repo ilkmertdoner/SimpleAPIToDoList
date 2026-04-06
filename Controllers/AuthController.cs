@@ -154,8 +154,7 @@ namespace TaskManagerApi.Controllers
             {
                 var settings = new GoogleJsonWebSignature.ValidationSettings
                 {
-                    Audience = new[]
-                { "787940789409-k70mn4qf4fatqgsjnlr3h7fn8dj7bklt.apps.googleusercontent.com" }
+                    Audience = new[] { _configuration["Authentication:Google:ClientId"] }
                 };
 
                 var payload = await GoogleJsonWebSignature.ValidateAsync(request.Token, settings);
@@ -288,7 +287,6 @@ namespace TaskManagerApi.Controllers
             var userIdClaim = User.Claims.FirstOrDefault(c => c.Type == "UserId")?.Value;
             if (string.IsNullOrEmpty(userIdClaim)) return Unauthorized("Kullanıcı kimliği bulunamadı.");
 
-
             int userId = int.Parse(userIdClaim);
             var user = await _dbContext.Users.FindAsync(userId);
 
@@ -323,7 +321,7 @@ namespace TaskManagerApi.Controllers
                 var members = _dbContext.GroupMembers.Where(gm => gm.GroupId == group.Id);
                 _dbContext.GroupMembers.RemoveRange(members);
             }
-            
+
             _dbContext.Groups.RemoveRange(createdGroups);
 
             var personalTasks = await _dbContext.TaskItems.Where(t => t.TokenId == userIdClaim && t.GroupId == null)
@@ -334,7 +332,7 @@ namespace TaskManagerApi.Controllers
                 var taskAssignments = _dbContext.TaskAssign.Where(ta => ta.TaskId == task.Id);
                 _dbContext.TaskAssign.RemoveRange(taskAssignments);
             }
-            
+
             _dbContext.TaskItems.RemoveRange(personalTasks);
 
             _dbContext.Users.Remove(user);
@@ -359,7 +357,7 @@ namespace TaskManagerApi.Controllers
                 issuer: _configuration["Jwt:Issuer"],
                 audience: _configuration["Jwt:Audience"],
                 claims: claims,
-                expires: DateTime.Now.AddHours(5.30),
+                expires: DateTime.Now.AddHours(5).AddMinutes(30),
                 signingCredentials: credentials
             );
 
